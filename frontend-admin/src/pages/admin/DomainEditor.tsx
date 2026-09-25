@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { DomainDetailRenderer } from "@shared/domain/DomainDetailRenderer";
 import type { Domain } from "@shared/domain/types";
-import { adminApi } from "@/lib/api";
+import { adminApi, API_BASE_URL, resolveApiAssetUrl } from "@/lib/api";
 import { useDomains } from "@/contexts/DomainsProvider";
 import { MobileDomainPreviewFrame } from "@/components/domain-preview/MobileDomainPreviewFrame";
 import type { MobileDomainPreviewFrameRef } from "@/components/domain-preview/MobileDomainPreviewFrame";
@@ -499,8 +499,10 @@ function ImagePanel({ domainId, domainSlug, accentColor, imageUrl, onImageChange
   // Determine which URL to display
   const resolveAdminDisplayUrl = (url: string | null) => {
     if (!url) return null;
+    const apiAssetUrl = resolveApiAssetUrl(url);
+    if (apiAssetUrl !== url) return apiAssetUrl;
     if (url.startsWith("blob:") || url.startsWith("data:") || url.startsWith("http://") || url.startsWith("https://")) return url;
-    const apiBase = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/+$/, "") || "/api/v1";
+    const apiBase = API_BASE_URL;
     if (url.startsWith("/api/v1/")) {
       return apiBase.startsWith("http") ? `${apiBase}${url.slice(7)}` : url;
     }
@@ -1209,7 +1211,7 @@ function PreviewStage({ domain, previewDevice, setPreviewDevice, previewZoom, se
                 marginTop: STAGE_PAD,
               }}
             >
-              <DomainDetailRenderer domain={domain} previewMode />
+              <DomainDetailRenderer domain={domain} previewMode apiBaseUrl={API_BASE_URL} />
             </div>
           ) : (
             /*
@@ -1249,7 +1251,7 @@ function PreviewStage({ domain, previewDevice, setPreviewDevice, previewZoom, se
                   transform: `scale(${scale})`,
                 }}
               >
-                <DomainDetailRenderer domain={domain} previewMode />
+                <DomainDetailRenderer domain={domain} previewMode apiBaseUrl={API_BASE_URL} />
               </div>
             </div>
           )}

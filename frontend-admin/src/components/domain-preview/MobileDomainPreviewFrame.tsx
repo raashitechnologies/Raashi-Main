@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useImperativeHandle, forwardRef } from 're
 import { createPortal } from 'react-dom';
 import { DomainDetailRenderer } from '@shared/domain/DomainDetailRenderer';
 import type { Domain } from '@shared/domain/types';
+import { API_BASE_URL } from '@/lib/api';
 
 export interface MobileDomainPreviewFrameProps {
   domain: Domain;
@@ -118,7 +119,7 @@ export const MobileDomainPreviewFrame = forwardRef<MobileDomainPreviewFrameRef, 
           }}
         />
         {iframeBody && createPortal(
-          <DomainDetailRenderer domain={domain} previewMode />,
+          <DomainDetailRenderer domain={domain} previewMode apiBaseUrl={API_BASE_URL} />,
           iframeBody
         )}
       </div>

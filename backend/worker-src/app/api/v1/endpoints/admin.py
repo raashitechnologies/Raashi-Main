@@ -251,7 +251,7 @@ async def delete_domain(
     return {"status": "deleted"}
 
 
-# ── Domain image management (GridFS) ─────────────────────────────────────────
+# ── Domain image management (R2; legacy metadata retains its historic key name)
 
 MAX_DOMAIN_IMAGE_SIZE = 10 * 1024 * 1024  # 10 MB
 
@@ -331,22 +331,30 @@ async def upload_domain_image(
     existing_gridfs_id = overview.get("image_gridfs_id")
     is_replacement = existing_gridfs_id is not None
 
-    if existing_gridfs_id:
-        try:
-            await delete_file(request.scope["env"], existing_gridfs_id)
-        except Exception as e:
-            logger.warning(f"Could not delete old domain image R2 file: {e}")
-
     object_key = f"domains/{domain['slug']}/{uuid.uuid4()}{ext}"
-    await upload_file(
-        request.scope["env"], 
-        content, 
-        object_key, 
-        file.content_type or f"image/{ext.lstrip('.')}"
-    )
-
     image_url = f"/api/v1/domains/{domain['slug']}/image"
-    await repo.update_image(domain_id, image_url, object_key)
+    try:
+        # Persist the replacement before deleting the live object. This keeps
+        # the existing image available if either downstream operation fails.
+        await upload_file(
+            request.scope["env"], content, object_key,
+            file.content_type or f"image/{ext.lstrip('.')}",
+        )
+        updated = await repo.update_image(domain_id, image_url, object_key)
+        if not updated:
+            raise RuntimeError("Domain image metadata update did not affect a row")
+    except Exception as exc:
+        # The old object and metadata have not been changed. Remove only the
+        # new unreferenced object on a best-effort basis.
+        await delete_file(request.scope["env"], object_key)
+        logger.error("Domain image replacement failed: domain_id=%s error=%s", domain_id, type(exc).__name__)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Image storage is temporarily unavailable. Please try again.",
+        ) from exc
+
+    if existing_gridfs_id and not await delete_file(request.scope["env"], existing_gridfs_id):
+        logger.warning("Could not delete replaced domain image R2 object: key=%s", existing_gridfs_id)
 
     action = "replace_image" if is_replacement else "upload_image"
     await audit.log(
@@ -1167,38 +1175,43 @@ async def upload_brochure(
             detail="File content does not appear to be a valid PDF.",
         )
 
-    # Delete any existing brochure files from R2
+    # Keep the existing object until the replacement is stored in R2 and its
+    # metadata has been committed. This avoids a broken public download if an
+    # upload or D1 write fails.
     existing_meta = await db.prepare("SELECT object_key FROM brochure WHERE key_name = 'current'").first()
     from app.services.r2_storage import upload_file, delete_file
 
-    if existing_meta and existing_meta.get("object_key"):
-        try:
-            await delete_file(request.scope["env"], existing_meta["object_key"])
-        except Exception as e:
-            logger.warning(f"Could not delete old brochure R2 file: {e}")
-
-    # Upload new file to R2
     object_key = f"brochure/{uuid.uuid4()}.pdf"
-    await upload_file(request.scope["env"], content, object_key, "application/pdf")
-
-    # Upsert brochure metadata (singleton document)
     now = datetime.now(timezone.utc).isoformat()
-    await db.prepare(
-        """
-        INSERT INTO brochure (id, key_name, filename, object_key, size_bytes, uploaded_by, uploaded_at, updated_at)
-        VALUES (?, 'current', ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(key_name) DO UPDATE SET
-            filename=excluded.filename,
-            object_key=excluded.object_key,
-            size_bytes=excluded.size_bytes,
-            uploaded_by=excluded.uploaded_by,
-            uploaded_at=excluded.uploaded_at,
-            updated_at=excluded.updated_at
-        """
-    ).bind(
-        str(uuid.uuid4()), file.filename or "brochure.pdf", object_key,
-        len(content), current_user["email"], now, now
-    ).run()
+    try:
+        await upload_file(request.scope["env"], content, object_key, "application/pdf")
+        await db.prepare(
+            """
+            INSERT INTO brochure (id, key_name, filename, object_key, size_bytes, uploaded_by, uploaded_at, updated_at)
+            VALUES (?, 'current', ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(key_name) DO UPDATE SET
+                filename=excluded.filename,
+                object_key=excluded.object_key,
+                size_bytes=excluded.size_bytes,
+                uploaded_by=excluded.uploaded_by,
+                uploaded_at=excluded.uploaded_at,
+                updated_at=excluded.updated_at
+            """
+        ).bind(
+            str(uuid.uuid4()), file.filename or "brochure.pdf", object_key,
+            len(content), current_user["email"], now, now
+        ).run()
+    except Exception as exc:
+        await delete_file(request.scope["env"], object_key)
+        logger.error("Brochure replacement failed: error=%s", type(exc).__name__)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Brochure storage is temporarily unavailable. Please try again.",
+        ) from exc
+
+    old_object_key = existing_meta and existing_meta.get("object_key")
+    if old_object_key and old_object_key != object_key and not await delete_file(request.scope["env"], old_object_key):
+        logger.warning("Could not delete replaced brochure R2 object: key=%s", old_object_key)
 
     await audit.log(
         current_user["id"], current_user["email"],

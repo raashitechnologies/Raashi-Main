@@ -16,6 +16,7 @@ def get_contact_repo(db: Any = Depends(get_database)) -> ContactRepository:
     return ContactRepository(db)
 
 
+@router.post("", response_model=ContactOut, status_code=status.HTTP_201_CREATED, include_in_schema=False)
 @router.post("/", response_model=ContactOut, status_code=status.HTTP_201_CREATED, summary="Submit contact message")
 @limiter.limit(get_settings().RATE_LIMIT_CONTACT)
 async def submit_contact(
@@ -40,5 +41,4 @@ async def submit_contact(
     )
 
     return ContactOut(id=doc_id)
-
 

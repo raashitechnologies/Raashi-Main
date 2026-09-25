@@ -1,12 +1,16 @@
 import axios from "axios";
 import { setupApiClient } from "@shared/lib/apiClient";
 
-// Configurable API base URL: defaults to "/api/v1" for local dev proxy,
-// or uses VITE_API_BASE_URL / VITE_API_URL in production.
+// Pages does not proxy API paths in production. Keep the development proxy
+// relative, but make production work even when a Pages build variable is absent.
+const DEFAULT_API_BASE_URL = import.meta.env.PROD
+  ? "https://api.raashitech.com/api/v1"
+  : "/api/v1";
+
 export const API_BASE_URL = (
   (import.meta.env.VITE_API_BASE_URL as string | undefined) ||
   (import.meta.env.VITE_API_URL as string | undefined) ||
-  "/api/v1"
+  DEFAULT_API_BASE_URL
 ).replace(/\/+$/, "");
 
 // Backend root URL (without /api/v1) for serving static files like uploads/resumes
@@ -15,14 +19,26 @@ export const BACKEND_URL = (
   API_BASE_URL.replace(/\/api\/v1\/?$/, "")
 ).replace(/\/+$/, "");
 
-/**
- * Resolves a resume/upload file URL to an absolute URL if needed.
- */
+/** Build an API URL without duplicating the `/api/v1` prefix. */
+export function getApiUrl(path: string): string {
+  if (/^https?:\/\//i.test(path)) return path;
+  const withoutApiPrefix = path.replace(/^\/?api\/v1(?=\/|$)/, "");
+  const cleanPath = withoutApiPrefix.startsWith("/") ? withoutApiPrefix : `/${withoutApiPrefix}`;
+  return `${API_BASE_URL}${cleanPath}`;
+}
+
+/** Resolve API-relative file URLs returned by the Worker. */
+export function resolveApiAssetUrl(url?: string | null): string | null {
+  if (!url) return null;
+  if (/^(https?:|blob:|data:)/i.test(url)) return url;
+  return url.startsWith("/api/") ? getApiUrl(url) : url;
+}
+
 export function getResumeUrl(url?: string | null): string {
   if (!url) return "#";
-  if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("blob:")) {
-    return url;
-  }
+  const apiAssetUrl = resolveApiAssetUrl(url);
+  if (apiAssetUrl !== url) return apiAssetUrl || "#";
+  if (/^(https?:|blob:)/i.test(url)) return url;
   const cleanPath = url.startsWith("/") ? url : `/${url}`;
   return BACKEND_URL ? `${BACKEND_URL}${cleanPath}` : cleanPath;
 }
