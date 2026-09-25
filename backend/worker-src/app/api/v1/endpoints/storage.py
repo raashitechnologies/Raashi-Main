@@ -18,8 +18,11 @@ async def download_file(request: Request, token: str):
     object_key = payload["object_key"]
     filename = payload.get("filename", "download")
 
-    from app.services.r2_storage import get_file
-    r2_obj = await get_file(request.scope["env"], object_key)
+    from app.services.r2_storage import get_file, R2StorageError
+    try:
+        r2_obj = await get_file(request.scope["env"], object_key)
+    except R2StorageError as exc:
+        raise HTTPException(503, "File storage is temporarily unavailable.") from exc
     if not r2_obj:
         raise HTTPException(404, "File not found.")
 

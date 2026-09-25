@@ -36,7 +36,7 @@ async def get_domain(slug: str, request: Request, repo: DomainRepository = Depen
     return domain
 
 
-@router.get("/{slug}/image", summary="Stream domain overview image from GridFS")
+@router.get("/{slug}/image", summary="Serve domain overview image from R2")
 @limiter.limit(get_settings().RATE_LIMIT_PUBLIC_READ)
 async def get_domain_image(
     slug: str,
@@ -61,8 +61,11 @@ async def get_domain_image(
 
     object_key = gridfs_id_str
 
-    from app.services.r2_storage import get_file
-    r2_obj = await get_file(request.scope["env"], object_key)
+    from app.services.r2_storage import get_file, R2StorageError
+    try:
+        r2_obj = await get_file(request.scope["env"], object_key)
+    except R2StorageError as exc:
+        raise HTTPException(status_code=503, detail="Image storage is temporarily unavailable.") from exc
     
     if not r2_obj:
         raise HTTPException(status_code=404, detail="Image not found in storage.")

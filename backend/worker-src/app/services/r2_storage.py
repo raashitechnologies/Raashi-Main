@@ -28,12 +28,12 @@ async def delete_file(env: Any, object_key: str) -> bool:
         return False
 
 async def get_file(env: Any, object_key: str) -> Optional[Any]:
-    """Get a file from Cloudflare R2. Returns the R2Object or None."""
+    """Get a file from Cloudflare R2; ``None`` means the key is absent."""
     try:
         return await env.R2.get(object_key)
     except Exception as exc:
         logging.getLogger(__name__).error("R2 get failed: key=%s error=%s", object_key, type(exc).__name__)
-        return None
+        raise R2StorageError("R2 retrieval failed") from exc
 
 def generate_signed_download_url(object_key: str, filename: str, expires_in_seconds: int = 3600) -> str:
     """

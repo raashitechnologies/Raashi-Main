@@ -5,6 +5,7 @@ contacts, users, reports, audit logs, and brochure management.
 """
 import os
 import uuid
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Request, status, UploadFile, File
 from app.core.rate_limiter import Limiter
 from app.core.rate_limiter import get_remote_address
@@ -31,6 +32,7 @@ from app.schemas import (
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 limiter = Limiter(key_func=get_remote_address)
+logger = logging.getLogger(__name__)
 
 # All endpoints require admin role
 admin_dep = require_role("admin")
@@ -238,12 +240,18 @@ async def delete_domain(
     try:
         domain = await repo.get_by_id_admin(domain_id)
         slug = domain.get("slug") if domain else None
+        image_object_key = (domain.get("overview") or {}).get("image_gridfs_id") if domain else None
         success = await repo.delete(domain_id)
     except ValueError:
         raise HTTPException(400, "Invalid domain ID format")
     if not success:
         raise HTTPException(404, "Domain not found")
     await audit.log(current_user["id"], current_user["email"], "delete", "domains", domain_id)
+
+    if image_object_key:
+        from app.services.r2_storage import delete_file
+        if not await delete_file(request.scope["env"], image_object_key):
+            logger.warning("Could not delete R2 image for deleted domain: key=%s", image_object_key)
     
     if slug:
         await trigger_indexnow_background([f"https://raashitech.com/domains/{slug}"])

@@ -70,8 +70,14 @@ async def download_brochure(
             detail="No brochure has been uploaded yet. Please check back later.",
         )
 
-    from app.services.r2_storage import get_file
-    r2_obj = await get_file(request.scope["env"], doc["object_key"])
+    from app.services.r2_storage import get_file, R2StorageError
+    try:
+        r2_obj = await get_file(request.scope["env"], doc["object_key"])
+    except R2StorageError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Brochure storage is temporarily unavailable. Please try again later.",
+        ) from exc
     if not r2_obj:
         raise HTTPException(
             status_code=404,
