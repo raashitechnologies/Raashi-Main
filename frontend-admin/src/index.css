@@ -1,0 +1,488 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Montserrat:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+@import "tailwindcss";
+@config "../tailwind.config.ts";
+@source "../../shared";
+
+@layer base {
+  :root {
+    --background: 40 42.9% 93.1%; /* #F5F0E6 — warm beige page canvas */
+    --foreground: 226 61% 23%;    /* #17285E Dark Navy */
+
+    --card: 0 0% 100%;            /* #FFFFFF — functional white for cards/forms */
+    --card-foreground: 226 61% 23%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 226 61% 23%;
+
+    --primary: 215 96% 45%;       /* #0560DF Primary Blue */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 0 0% 100%;
+    --secondary-foreground: 226 61% 23%;
+
+    --muted: 30 15% 94%;          /* ~#F1F1EE warm gray for muted surfaces */
+    --muted-foreground: 226 30% 45%;
+
+    --accent: 16 95% 52%;         /* #F94F0E Brand Orange */
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 2 84% 54%;     /* #EE3128 Red */
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 25 20% 83%;         /* warm neutral border */
+    --input: 226 61% 23%;
+    --ring: 215 96% 45%;
+
+    --radius: 0.75rem;            /* 12px */
+  }
+
+  * {
+    @apply border-border;
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', 'Plus Jakarta Sans', 'Manrope', sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+    color: #17285E;
+  }
+}
+
+@layer components {
+  /* ── Gradient text utilities ── */
+  .text-gradient-cognitive {
+    background: linear-gradient(135deg, #0560DF 0%, #7A1FD0 50%, #EE3128 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .text-gradient-motion {
+    background: linear-gradient(135deg, #0560DF 0%, #F94F0E 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+
+  /* ── Brand cards (unchanged) ── */
+  .brand-card {
+    @apply bg-white rounded-xl shadow-soft border border-brand-navy/[0.08] p-6 transition-all duration-200;
+  }
+  .brand-card:hover {
+    @apply shadow-soft-hover;
+    transform: translateY(-4px);
+  }
+
+  /* ── Brand Tiles — INTENTIONALLY UNCHANGED ──────────────────────────────
+     white bg + navy shadow = existing Raashi brand identity.
+     Do NOT alter this class globally. Use .warm-tile / .warm-tile-alt
+     at the component level for selected editorial tile groups.
+  ─────────────────────────────────────────────────────────────────────── */
+  .brand-tile {
+    @apply bg-white rounded-xl shadow-soft border p-6 transition-all duration-200;
+  }
+  .brand-tile:hover {
+    @apply shadow-soft-hover;
+    transform: translateY(-4px);
+  }
+
+  /* ── Warm Tile — primary editorial tile treatment ────────────────────────
+     Applied EXPLICITLY to selected tile groups only.
+     NOT a global brand-tile override.
+     Uses: #F1F1EE bg | #E98A3A border | #174A7E text | warm-orange shadow
+  ─────────────────────────────────────────────────────────────────────── */
+  .warm-tile {
+    background: #F1F1EE;
+    border: 1px solid rgba(233, 138, 58, 0.22);
+    color: #174A7E;
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 4px 20px -2px rgba(233, 138, 58, 0.07);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  }
+  .warm-tile:hover {
+    border-color: rgba(233, 138, 58, 0.42);
+    box-shadow: 0 10px 30px -4px rgba(233, 138, 58, 0.12);
+    transform: translateY(-4px);
+  }
+
+  /* ── Warm Tile Alt — beige bg variation for alternating visual rhythm ───
+     Uses: #F5F0E6 bg | subtler #E98A3A border | same #174A7E text
+  ─────────────────────────────────────────────────────────────────────── */
+  .warm-tile-alt {
+    background: #F5F0E6;
+    border: 1px solid rgba(233, 138, 58, 0.18);
+    color: #174A7E;
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 4px 20px -2px rgba(233, 138, 58, 0.06);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  }
+  .warm-tile-alt:hover {
+    border-color: rgba(233, 138, 58, 0.38);
+    box-shadow: 0 10px 30px -4px rgba(233, 138, 58, 0.10);
+    transform: translateY(-4px);
+  }
+
+  /* Tile Accent Modifiers (for existing brand-tile) */
+  .tile-accent-blue    { @apply border-brand-blue/20    hover:border-brand-blue/40; }
+  .tile-accent-orange  { @apply border-brand-orange/20  hover:border-brand-orange/40; }
+  .tile-accent-navy    { @apply border-brand-navy/20    hover:border-brand-navy/40; }
+  .tile-accent-magenta { @apply border-brand-magenta/20 hover:border-brand-magenta/40; }
+  .tile-accent-royal   { @apply border-brand-royal/20   hover:border-brand-royal/40; }
+  .tile-accent-red     { @apply border-brand-red/20     hover:border-brand-red/40; }
+  /* Warm accent — adds warm border to brand-tile without changing bg */
+  .tile-accent-warm    { border-color: rgba(233, 138, 58, 0.22); }
+  .tile-accent-warm:hover { border-color: rgba(233, 138, 58, 0.42); }
+
+  /* ── Section container ── */
+  .section-container {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  /* ── Eyebrow label ── */
+  .eyebrow {
+    @apply text-xs font-semibold tracking-[0.15em] uppercase text-brand-blue;
+  }
+
+  /* ── Glassmorphism header (unchanged) ── */
+  .glass-nav {
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(23, 40, 94, 0.08);
+  }
+
+  /* ── Focus ring brand ── */
+  .focus-brand:focus-visible {
+    outline: none;
+    ring: 2px;
+    ring-color: #0560DF;
+    ring-offset: 2px;
+  }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #F1F1EE;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #0560DF33;
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #0560DF66;
+  }
+
+  /* ── Orange text highlight ── */
+  .text-orange {
+    color: #F94F0E;
+  }
+
+  /* ── Domain accent borders (unchanged) ── */
+  .domain-border-ai {
+    border-top: 4px solid #0560DF;
+    border-color: rgba(5, 96, 223, 0.2);
+  }
+  .domain-border-ai:hover, .group:hover .domain-border-ai { border-color: rgba(5, 96, 223, 0.4); }
+
+  .domain-border-rd {
+    border-top: 4px solid #D11753;
+    border-color: rgba(209, 23, 83, 0.2);
+  }
+  .domain-border-rd:hover, .group:hover .domain-border-rd { border-color: rgba(209, 23, 83, 0.4); }
+
+  .domain-border-iot {
+    border-top: 4px solid #0E2F9D;
+    border-color: rgba(14, 47, 157, 0.2);
+  }
+  .domain-border-iot:hover, .group:hover .domain-border-iot { border-color: rgba(14, 47, 157, 0.4); }
+
+  .domain-border-eng {
+    border-top: 4px solid #F94F0E;
+    border-color: rgba(249, 79, 14, 0.2);
+  }
+  .domain-border-eng:hover, .group:hover .domain-border-eng { border-color: rgba(249, 79, 14, 0.4); }
+
+  .domain-border-edu {
+    border-top: 4px solid #17285E;
+    border-color: rgba(23, 40, 94, 0.2);
+  }
+  .domain-border-edu:hover, .group:hover .domain-border-edu { border-color: rgba(23, 40, 94, 0.4); }
+}
+
+@layer components {
+  /* ── Dashboard Sidebar ── */
+  .sidebar-gradient {
+    background: linear-gradient(180deg, #131c38 0%, #0f1729 100%);
+  }
+
+  .sidebar-nav-item {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13.5px] font-medium transition-all duration-200;
+  }
+  .sidebar-nav-item--active {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    box-shadow: inset 3px 0 0 0 rgba(99, 160, 255, 0.7);
+  }
+  .sidebar-nav-item--inactive {
+    color: rgba(255, 255, 255, 0.45);
+  }
+  .sidebar-nav-item--inactive:hover {
+    color: rgba(255, 255, 255, 0.75);
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .sidebar-section-label {
+    @apply text-[10px] font-bold tracking-[0.12em] uppercase px-3 pt-5 pb-2;
+    color: rgba(99, 160, 255, 0.55);
+    letter-spacing: 0.12em;
+  }
+  .sidebar-section-label:first-child {
+    padding-top: 0;
+  }
+
+  /* ── Dashboard workspace ── */
+  .bg-dashboard {
+    background-color: #F7F8FC;
+  }
+
+  .dashboard-card {
+    @apply bg-white rounded-2xl border border-gray-200/60 transition-all duration-200;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  }
+  .dashboard-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+    border-color: rgba(0, 0, 0, 0.1);
+  }
+
+  /* ── Dashboard empty state ── */
+  .empty-state {
+    @apply flex flex-col items-center justify-center py-12 px-4 text-center;
+  }
+  .empty-state-icon {
+    @apply w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center mb-3;
+  }
+  .empty-state-title {
+    @apply text-sm font-semibold text-gray-500 mb-1;
+  }
+  .empty-state-desc {
+    @apply text-xs text-gray-400 max-w-[220px];
+  }
+}
+
+@layer utilities {
+  .bg-navy-gradient {
+    background: linear-gradient(135deg, #17285E 0%, #0E2F9D 100%);
+  }
+
+  .hero-glow {
+    background: radial-gradient(ellipse 60% 50% at 50% 50%, rgba(5, 96, 223, 0.15) 0%, transparent 70%);
+  }
+
+  .section-py {
+    @apply py-16 md:py-20 lg:py-24;
+  }
+
+  .min-h-viewport {
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  .h-viewport {
+    height: 100vh;
+    height: 100dvh;
+  }
+
+  .animate-fade-up {
+    animation: fade-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(24px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* ── Reference Glass Header ──────────────────────────────────────────────── */
+  .reference-glass-header {
+    background: rgba(23, 40, 94, 0.60);
+    backdrop-filter: blur(24px) saturate(160%) brightness(0.95);
+    -webkit-backdrop-filter: blur(24px) saturate(160%) brightness(0.95);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.30),
+      inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  }
+
+  /* Reduced-transparency fallback for the glass header */
+  @media (prefers-reduced-transparency: reduce) {
+    .reference-glass-header {
+      background: rgba(23, 40, 94, 0.95);
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+  }
+
+  /* ── Liquid Glass Pill — animated nav active indicator ─────────────────────
+     Translucent, deep optical glass material with multiple material layers:
+     - Glass body: subtle radial gradient (mostly transparent)
+     - Backdrop filter: blur + saturation
+     - ::after : Soft specular top-left highlight
+     - ::before : Restrained chromatic aberration fringe
+  ─────────────────────────────────────────────────────────────────────────── */
+  .liquid-glass-pill {
+    background: radial-gradient(
+      120% 160% at 25% 0%,
+      rgba(255, 255, 255, 0.25) 0%,
+      rgba(255, 255, 255, 0.12) 45%,
+      rgba(255, 255, 255, 0.04) 100%
+    );
+    box-shadow:
+      inset 0 1px 1px rgba(255, 255, 255, 0.35),
+      inset 0 -1px 1px rgba(10, 20, 60, 0.15),
+      0 4px 12px rgba(23, 40, 94, 0.20),
+      0 1px 2px rgba(23, 40, 94, 0.10);
+    backdrop-filter: blur(12px) saturate(140%) brightness(1.1);
+    -webkit-backdrop-filter: blur(12px) saturate(140%) brightness(1.1);
+    isolation: isolate;
+  }
+
+  /* Specular Highlight */
+  .liquid-glass-pill::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(
+      ellipse 80% 60% at 25% 0%,
+      rgba(255, 255, 255, 0.35) 0%,
+      rgba(255, 255, 255, 0.10) 40%,
+      transparent 70%
+    );
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* Chromatic aberration fringe — 1 px conic-gradient ring masked to edge only */
+  .liquid-glass-pill::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1px;
+    background: conic-gradient(
+      from 180deg,
+      rgba(249, 79, 14, 0.25),
+      rgba(5, 96, 223, 0.25),
+      rgba(209, 23, 83, 0.25),
+      rgba(249, 79, 14, 0.25)
+    );
+    -webkit-mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0.8;
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  /* Reduced-transparency fallback — solid bright pill, no blur or fringe */
+  @media (prefers-reduced-transparency: reduce) {
+    .liquid-glass-pill {
+      background: rgba(248, 250, 252, 0.95);
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+    .liquid-glass-pill::before,
+    .liquid-glass-pill::after {
+      display: none;
+    }
+  }
+
+  /* ── Header Grid Layout ─────────────────────────────────────────────────── */
+  @media (min-width: 1280px) {
+    .header-inner-grid {
+      display: grid;
+      /* Adjusted grid columns after considering typical content widths */
+      grid-template-columns: 290px minmax(0, 1fr) 210px 140px;
+      align-items: center;
+      width: 100%;
+    }
+
+    .brand-slot {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+    }
+
+    .navigation-slot {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: visible;
+    }
+
+    .cta-slot {
+      width: 210px;
+      min-width: 210px;
+      max-width: 210px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .header-cta-button {
+      width: 210px;
+      min-width: 210px;
+      max-width: 210px;
+    }
+
+    .account-slot {
+      width: 140px;
+      min-width: 140px;
+      max-width: 140px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+    }
+  }
+}
+
+/* ─── CMS Admin: Preview Section Highlight ─────────────────────────────────── */
+/* Applied programmatically via JS when admin navigates between sections.
+   Only used inside the live-preview panel. Never applied on the public site.   */
+
+@keyframes preview-highlight-ring {
+  0%   { box-shadow: 0 0 0 0px rgba(5, 96, 223, 0); }
+  12%  { box-shadow: 0 0 0 3px rgba(5, 96, 223, 0.45); }
+  65%  { box-shadow: 0 0 0 3px rgba(5, 96, 223, 0.20); }
+  100% { box-shadow: 0 0 0 0px rgba(5, 96, 223, 0); }
+}
+
+.preview-section-highlight {
+  animation: preview-highlight-ring 1.5s ease-out forwards;
+  position: relative;
+  z-index: 1;
+}

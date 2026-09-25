@@ -1,0 +1,20 @@
+# Local environments created by uv/pywrangler. They are development tools, not
+# Worker modules; pywrangler vendors deployable dependencies into python_modules/.
+.venv/
+.venv-workers/
+.migration-venv/
+venv/
+
+# Generated Wrangler/package output.
+bundled/
+.wrangler/
+
+# Python/test/lint caches.
+**/__pycache__/
+.pytest_cache/
+.ruff_cache/
+.env
+.env.*
+!.env.example
+.env.migration
+.env.r2-migration

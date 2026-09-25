@@ -1,0 +1,45 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "raashi-backend-worker",
+  "main": "worker-src/worker.py",
+  "base_dir": "worker-src",
+  "compatibility_date": "2026-09-24",
+  "compatibility_flags": ["python_workers"],
+  "python_modules": {
+    "exclude": ["**/*.pyc", "**/__pycache__", "**/.pytest_cache/**", "**/.ruff_cache/**"]
+  },
+  "vars": {
+    "ENVIRONMENT": "production",
+    "CORS_ORIGINS": "https://raashitech.com,https://www.raashitech.com,https://admin.raashitech.com",
+    "PUBLIC_FRONTEND_URL": "https://raashitech.com",
+    "ADMIN_FRONTEND_URL": "https://admin.raashitech.com",
+    "API_BASE_URL": "https://api.raashitech.com"
+  },
+
+  "routes": [
+    {
+      "pattern": "api.raashitech.com",
+      "custom_domain": true
+    }
+  ],
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "raashi_technologies",
+      "database_id": "b101bf7e-600b-4ef2-80f9-80bb78b6c121",
+      "migrations_dir": "scripts/migrations"
+    }
+  ],
+
+  "r2_buckets": [
+    {
+      "binding": "R2",
+      "bucket_name": "raashi-technologies"
+    }
+  ],
+
+  "observability": {
+    "enabled": true
+  }
+}
