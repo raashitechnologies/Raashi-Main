@@ -393,12 +393,12 @@ dependencies = [
     { name = "httpx" },
     { name = "pydantic" },
     { name = "python-multipart" },
+    { name = "workers-runtime-sdk" },
 ]
 
 [package.dev-dependencies]
 dev = [
     { name = "workers-py" },
-    { name = "workers-runtime-sdk" },
 ]
 
 [package.metadata]
@@ -409,13 +409,11 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "pydantic", specifier = ">=2.14.0b2" },
     { name = "python-multipart", specifier = ">=0.0.9" },
+    { name = "workers-runtime-sdk", specifier = "==1.9.0" },
 ]
 
 [package.metadata.requires-dev]
-dev = [
-    { name = "workers-py" },
-    { name = "workers-runtime-sdk" },
-]
+dev = [{ name = "workers-py" }]
 
 [[package]]
 name = "rich"

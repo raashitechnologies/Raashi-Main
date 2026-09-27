@@ -160,22 +160,26 @@ async def apply_internship(
             detail="Unable to submit your application right now. Please try again.",
         ) from exc
 
-    from app.services.email_service import send_internship_notification, send_application_thank_you_email
-    await send_internship_notification(
-        full_name=full_name,
-        email=email,
-        phone=phone,
-        domain_slug=domain_slug,
-        mode=mode,
-        college=college,
-        course_year=course_year,
-        message=message,
-    )
+    # D1 (and any resume upload) has succeeded. Email is best-effort only.
+    try:
+        from app.services.email_service import send_application_thank_you_email, send_internship_notification
 
-    await send_application_thank_you_email(
-        to_email=email,
-        applicant_name=full_name,
-        application_type="internship",
-    )
+        await send_internship_notification(
+            full_name=full_name,
+            email=email,
+            phone=phone,
+            domain_slug=domain_slug,
+            mode=mode,
+            college=college,
+            course_year=course_year,
+            message=message,
+        )
+        await send_application_thank_you_email(
+            to_email=email,
+            applicant_name=full_name,
+            application_type="internship",
+        )
+    except Exception:
+        logger.exception("Internship notification email failed after application persistence: id=%s", doc_id)
 
     return InternshipApplicationOut(id=doc_id)

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { adminApi } from "@/lib/api";
+import { getApplicationId } from "@/lib/applicationId";
 import { Search, Filter, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import { SectionLoading } from "@shared/ui/LoadingStates";
 import { ErrorState, EmptyState } from "@shared/ui/FeedbackStates";
@@ -81,22 +82,29 @@ export default function CareerApplications() {
           <th className="px-5 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wider">Date</th>
           <th className="px-5 py-3"></th>
         </tr></thead><tbody className="divide-y divide-gray-50">
-          {filtered.map((app) => (
-            <tr key={app.id as string} className="hover:bg-gray-50/50">
+          {filtered.map((app, index) => {
+            const applicationId = getApplicationId(app, "admin career applications");
+            return (
+            <tr key={applicationId ?? `malformed-${index}`} className="hover:bg-gray-50/50">
               <td className="px-5 py-3.5"><p className="font-medium text-gray-800">{app.full_name as string}</p><p className="text-xs text-gray-400">{app.email as string}</p></td>
               <td className="px-5 py-3.5 text-gray-600">{app.position as string}</td>
               <td className="px-5 py-3.5"><span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${statusColors[app.status as string] || "bg-gray-100 text-gray-600"}`}>{(app.status as string)?.replace("_", " ")}</span></td>
               <td className="px-5 py-3.5 text-gray-400 text-xs">{new Date(app.created_at as string).toLocaleDateString()}</td>
               <td className="px-5 py-3.5">
                 <div className="flex items-center gap-3">
-                  <Link to={`/admin/career-applications/${app.id}`} className="text-xs font-semibold text-brand-blue hover:underline">View</Link>
-                  <button onClick={() => handleDelete(app.id as string)} className="text-red-500 hover:text-red-600 transition-colors" title="Delete application">
+                  {applicationId ? (
+                    <Link to={`/admin/career-applications/${applicationId}`} className="text-xs font-semibold text-brand-blue hover:underline">View</Link>
+                  ) : (
+                    <span className="text-xs font-semibold text-gray-400" title="This record is missing its application ID">Unavailable</span>
+                  )}
+                  <button onClick={() => applicationId && handleDelete(applicationId)} disabled={!applicationId} className="text-red-500 hover:text-red-600 transition-colors disabled:cursor-not-allowed disabled:opacity-40" title="Delete application">
                     <Trash2 size={16} />
                   </button>
                 </div>
               </td>
             </tr>
-          ))}
+            );
+          })}
         </tbody></table></div>}
         {total > limit && (
           <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100">

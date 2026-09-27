@@ -13,12 +13,6 @@ export const API_BASE_URL = (
   DEFAULT_API_BASE_URL
 ).replace(/\/+$/, "");
 
-// Backend root URL (without /api/v1) for serving static files like uploads/resumes
-export const BACKEND_URL = (
-  (import.meta.env.VITE_BACKEND_URL as string | undefined) ||
-  API_BASE_URL.replace(/\/api\/v1\/?$/, "")
-).replace(/\/+$/, "");
-
 /** Build an API URL without duplicating the `/api/v1` prefix. */
 export function getApiUrl(path: string): string {
   if (/^https?:\/\//i.test(path)) return path;
@@ -32,15 +26,6 @@ export function resolveApiAssetUrl(url?: string | null): string | null {
   if (!url) return null;
   if (/^(https?:|blob:|data:)/i.test(url)) return url;
   return url.startsWith("/api/") ? getApiUrl(url) : url;
-}
-
-export function getResumeUrl(url?: string | null): string {
-  if (!url) return "#";
-  const apiAssetUrl = resolveApiAssetUrl(url);
-  if (apiAssetUrl !== url) return apiAssetUrl || "#";
-  if (/^(https?:|blob:)/i.test(url)) return url;
-  const cleanPath = url.startsWith("/") ? url : `/${url}`;
-  return BACKEND_URL ? `${BACKEND_URL}${cleanPath}` : cleanPath;
 }
 
 const api = axios.create({
@@ -164,6 +149,41 @@ function redirectToLogin() {
 
 export default api;
 
+/** Download an authenticated private R2 file through the Worker API. */
+export async function downloadProtectedFile(path: string, fallbackFilename = "resume.pdf"): Promise<void> {
+  const response = await api.get<Blob>(path, { responseType: "blob" });
+  const disposition = response.headers["content-disposition"] as string | undefined;
+  const filename = disposition?.match(/filename="?([^";]+)"?/i)?.[1] || fallbackFilename;
+  const contentType = (response.headers["content-type"] as string | undefined) || "application/octet-stream";
+  const blob = response.data instanceof Blob
+    ? response.data
+    : new Blob([response.data], { type: contentType });
+
+  // Never assign an absent URL to an anchor. Browsers resolve an `undefined`
+  // href relative to the current application-detail route, which is how a
+  // download failure previously became `/internship-applications/undefined`.
+  if (typeof URL.createObjectURL !== "function") {
+    throw new Error("This browser does not support protected file downloads.");
+  }
+  const objectUrl = URL.createObjectURL(blob);
+  if (!objectUrl || !objectUrl.startsWith("blob:")) {
+    throw new Error("Could not create a download URL for the protected file.");
+  }
+
+  const anchor = document.createElement("a");
+  anchor.href = objectUrl;
+  anchor.download = filename;
+  anchor.style.display = "none";
+  document.body.appendChild(anchor);
+  try {
+    anchor.click();
+  } finally {
+    anchor.remove();
+    // Let the browser begin the download before releasing its object URL.
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+  }
+}
+
 // ── Auth API calls ──────────────────────────────────────────────────────────
 
 export interface User {
@@ -249,7 +269,7 @@ export const adminApi = {
   listInternshipApps: (params?: Record<string, string | number>) =>
     api.get("/admin/internship-applications", { params }),
   getInternshipApp: (id: string) => api.get(`/admin/internship-applications/${id}`),
-  getInternshipResumeUrl: (id: string) => api.get<{ url: string; legacy?: boolean }>(`/admin/internship-applications/${id}/resume`),
+  downloadInternshipResume: (id: string) => downloadProtectedFile(`/admin/internship-applications/${id}/resume`),
   updateInternshipAppStatus: (id: string, status: string) =>
     api.patch(`/admin/internship-applications/${id}/status`, { status }),
   addInternshipRemark: (id: string, remark: string) =>
@@ -266,7 +286,7 @@ export const adminApi = {
   listCareerApps: (params?: Record<string, string | number>) =>
     api.get("/admin/career-applications", { params }),
   getCareerApp: (id: string) => api.get(`/admin/career-applications/${id}`),
-  getCareerResumeUrl: (id: string) => api.get<{ url: string; legacy?: boolean }>(`/admin/career-applications/${id}/resume`),
+  downloadCareerResume: (id: string) => downloadProtectedFile(`/admin/career-applications/${id}/resume`),
   updateCareerAppStatus: (id: string, status: string) =>
     api.patch(`/admin/career-applications/${id}/status`, { status }),
   addCareerRemark: (id: string, remark: string) =>
@@ -310,7 +330,7 @@ export const coordinatorApi = {
   listInternshipApps: (params?: Record<string, string | number>) =>
     api.get("/coordinator/internship-applications", { params }),
   getInternshipApp: (id: string) => api.get(`/coordinator/internship-applications/${id}`),
-  getInternshipResumeUrl: (id: string) => api.get<{ url: string; legacy?: boolean }>(`/coordinator/internship-applications/${id}/resume`),
+  downloadInternshipResume: (id: string) => downloadProtectedFile(`/coordinator/internship-applications/${id}/resume`),
   updateInternshipAppStatus: (id: string, status: string) =>
     api.patch(`/coordinator/internship-applications/${id}/status`, { status }),
   addInternshipRemark: (id: string, remark: string) =>
@@ -319,7 +339,7 @@ export const coordinatorApi = {
   listCareerApps: (params?: Record<string, string | number>) =>
     api.get("/coordinator/career-applications", { params }),
   getCareerApp: (id: string) => api.get(`/coordinator/career-applications/${id}`),
-  getCareerResumeUrl: (id: string) => api.get<{ url: string; legacy?: boolean }>(`/coordinator/career-applications/${id}/resume`),
+  downloadCareerResume: (id: string) => downloadProtectedFile(`/coordinator/career-applications/${id}/resume`),
   updateCareerAppStatus: (id: string, status: string) =>
     api.patch(`/coordinator/career-applications/${id}/status`, { status }),
   addCareerRemark: (id: string, remark: string) =>

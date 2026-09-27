@@ -6,7 +6,9 @@ from app.core.database import get_database
 from app.core.config import get_settings
 from app.repositories import ContactRepository
 from app.schemas import ContactCreate, ContactOut
-import asyncio
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/contact", tags=["contact"])
 limiter = Limiter(key_func=get_remote_address)
@@ -26,19 +28,23 @@ async def submit_contact(
 ):
     doc_id = await repo.create(body.model_dump())
 
-    from app.services.email_service import send_contact_notification, send_contact_thank_you_email
-    await send_contact_notification(
-        full_name=body.full_name,
-        email=body.email,
-        phone=body.phone or "N/A",
-        subject=body.subject,
-        message=body.message,
-    )
+    # The contact message is already durable in D1; notification email must not change success.
+    try:
+        from app.services.email_service import send_contact_notification, send_contact_thank_you_email
 
-    await send_contact_thank_you_email(
-        to_email=body.email,
-        contact_name=body.full_name,
-    )
+        await send_contact_notification(
+            full_name=body.full_name,
+            email=body.email,
+            phone=body.phone or "N/A",
+            subject=body.subject,
+            message=body.message,
+        )
+        await send_contact_thank_you_email(
+            to_email=body.email,
+            contact_name=body.full_name,
+        )
+    except Exception:
+        logger.exception("Contact notification email failed after message persistence: id=%s", doc_id)
 
     return ContactOut(id=doc_id)
 

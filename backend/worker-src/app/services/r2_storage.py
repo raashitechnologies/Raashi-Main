@@ -1,8 +1,5 @@
 from typing import Optional, Any
 import logging
-import time
-from app.core.jwt_utils import encode as jwt_encode
-from app.core.config import get_settings
 
 class R2StorageError(Exception):
     """Base class for R2 storage exceptions."""
@@ -35,23 +32,22 @@ async def get_file(env: Any, object_key: str) -> Optional[Any]:
         logging.getLogger(__name__).error("R2 get failed: key=%s error=%s", object_key, type(exc).__name__)
         raise R2StorageError("R2 retrieval failed") from exc
 
-def generate_signed_download_url(object_key: str, filename: str, expires_in_seconds: int = 3600) -> str:
-    """
-    Since R2 via Worker bindings doesn't have a built-in presigned URL generator like boto3,
-    we generate a JWT token containing the object_key and create a URL to our own API.
-    The API will verify the token and stream the file from R2.
-    """
-    settings = get_settings()
-    
-    payload = {
-        "object_key": object_key,
-        "filename": filename,
-        "exp": time.time() + expires_in_seconds,
-        "purpose": "r2_download"
-    }
-    
-    token = jwt_encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
-    
-    # URL to our new FastAPI endpoint that handles these downloads
-    base_url = settings.API_BASE_URL.rstrip("/")
-    return f"{base_url}/storage/download?token={token}"
+async def read_file(env: Any, object_key: str) -> Optional[tuple[bytes, str]]:
+    """Read an R2 object for an already-authorized download endpoint."""
+    r2_obj = await get_file(env, object_key)
+    if r2_obj is None:
+        return None
+
+    try:
+        content = bytes(await r2_obj.arrayBuffer())
+    except Exception as exc:
+        logging.getLogger(__name__).error(
+            "R2 read failed: key=%s error=%s", object_key, type(exc).__name__,
+        )
+        raise R2StorageError("R2 read failed") from exc
+
+    metadata = getattr(r2_obj, "httpMetadata", None)
+    content_type = getattr(metadata, "contentType", None)
+    if not content_type and isinstance(metadata, dict):
+        content_type = metadata.get("contentType")
+    return content, content_type or "application/octet-stream"

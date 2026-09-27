@@ -5,6 +5,7 @@ Admins can also access coordinator endpoints.
 Focused on application screening, candidate management, and coordination.
 """
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import Response
 from app.core.rate_limiter import Limiter
 from app.core.rate_limiter import get_remote_address
 from typing import Any
@@ -42,6 +43,28 @@ def get_audit_repo(db: Any = Depends(get_database)) -> AuditLogRepository:
 
 def get_listing_repo(db: Any = Depends(get_database)) -> InternshipListingRepository:
     return InternshipListingRepository(db)
+
+
+async def _resume_response(request: Request, object_key: str) -> Response:
+    """Stream a private R2 resume after the endpoint role check has succeeded."""
+    from app.services.r2_storage import R2StorageError, read_file
+
+    try:
+        result = await read_file(request.scope["env"], object_key)
+    except R2StorageError as exc:
+        raise HTTPException(503, "File storage is temporarily unavailable") from exc
+    if result is None:
+        raise HTTPException(404, "Resume file not found")
+
+    content, content_type = result
+    return Response(
+        content=content,
+        media_type=content_type,
+        headers={
+            "Content-Disposition": 'attachment; filename="resume.pdf"',
+            "Cache-Control": "private, no-store",
+        },
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -179,10 +202,11 @@ async def update_internship_status(
 
 @router.get(
     "/internship-applications/{app_id}/resume",
-    summary="Generate a temporary resume download URL",
+    summary="Download an internship resume",
 )
 async def get_internship_resume_url(
     app_id: str,
+    request: Request,
     current_user: dict = Depends(coord_dep),
     repo: InternshipRepository = Depends(get_internship_repo),
 ):
@@ -195,18 +219,8 @@ async def get_internship_resume_url(
 
     object_key = app.get("resume_object_key")
     if not object_key:
-        # Check legacy record
-        legacy_url = app.get("resume_url")
-        if legacy_url:
-            return {"url": legacy_url, "legacy": True}
         raise HTTPException(404, "No resume on file for this application")
-
-    from app.services.r2_storage import generate_signed_download_url, R2StorageError
-    try:
-        url = generate_signed_download_url(object_key, "resume.pdf")
-    except R2StorageError as exc:
-        raise HTTPException(503, str(exc))
-    return {"url": url}
+    return await _resume_response(request, object_key)
 
 
 @router.post("/internship-applications/{app_id}/remarks", summary="Add screening remark")
@@ -267,10 +281,11 @@ async def get_career_application(
 
 @router.get(
     "/career-applications/{app_id}/resume",
-    summary="Generate a temporary resume download URL",
+    summary="Download a career resume",
 )
 async def get_career_resume_url(
     app_id: str,
+    request: Request,
     current_user: dict = Depends(coord_dep),
     repo: CareerRepository = Depends(get_career_repo),
 ):
@@ -283,18 +298,8 @@ async def get_career_resume_url(
 
     object_key = app.get("resume_object_key")
     if not object_key:
-        # Check legacy record
-        legacy_url = app.get("resume_url")
-        if legacy_url:
-            return {"url": legacy_url, "legacy": True}
         raise HTTPException(404, "No resume on file for this application")
-
-    from app.services.r2_storage import generate_signed_download_url, R2StorageError
-    try:
-        url = generate_signed_download_url(object_key, "resume.pdf")
-    except R2StorageError as exc:
-        raise HTTPException(503, str(exc))
-    return {"url": url}
+    return await _resume_response(request, object_key)
 
 
 @router.patch("/career-applications/{app_id}/status", summary="Update career application status")

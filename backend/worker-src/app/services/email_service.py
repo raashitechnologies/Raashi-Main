@@ -8,8 +8,10 @@ Gracefully skips if Resend is not configured (development).
 Never raises exceptions to callers — logs errors and returns silently.
 """
 import logging
-import asyncio
-from typing import Optional
+from collections.abc import Sequence
+from typing import Any, Optional
+
+import httpx
 
 from app.core.config import get_settings
 
@@ -109,64 +111,74 @@ def _status_label(status: str) -> str:
 
 # ── Core Send Function ───────────────────────────────────────────────────────
 
-async def send_email(to: str, subject: str, html: str) -> bool:
-    """
-    Send an email via Resend REST API (Cloudflare Worker compatible).
-    """
+def _build_resend_payload(
+    to: str | Sequence[str],
+    subject: str,
+    html: str,
+    *,
+    reply_to: str | None = None,
+    attachments: Sequence[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Build a Resend REST payload; Resend always receives a list of recipients."""
+    settings = get_settings()
+    recipients = [to] if isinstance(to, str) else list(to)
+    if not recipients or any(not recipient for recipient in recipients):
+        raise ValueError("At least one non-empty email recipient is required")
+
+    payload: dict[str, Any] = {
+        "from": settings.EMAIL_FROM,
+        "to": recipients,
+        "subject": subject,
+        "html": html,
+    }
+    if reply_to:
+        payload["reply_to"] = reply_to
+    if attachments:
+        payload["attachments"] = list(attachments)
+    return payload
+
+
+async def send_email(
+    to: str | Sequence[str],
+    subject: str,
+    html: str,
+    *,
+    reply_to: str | None = None,
+    attachments: Sequence[dict[str, Any]] | None = None,
+) -> bool:
+    """Send an email through Resend's HTTPS API using the Worker-safe httpx path."""
     settings = get_settings()
 
     if not settings.resend_configured:
         logger.info("Resend not configured — skipping email to %s: %s", to, subject)
         return False
 
-    url = "https://api.resend.com/emails"
+    payload = _build_resend_payload(
+        to, subject, html, reply_to=reply_to, attachments=attachments,
+    )
     headers = {
         "Authorization": f"Bearer {settings.RESEND_API_KEY}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "from": settings.EMAIL_FROM,
-        "to": [to],
-        "subject": subject,
-        "html": html
+        "Content-Type": "application/json",
     }
 
     try:
-        # Use Workers-native fetch API (no httpx dependency needed)
-        from js import fetch, Headers, Request
-        import json as _json
-
-        js_headers = Headers.new({
-            "Authorization": f"Bearer {settings.RESEND_API_KEY}",
-            "Content-Type": "application/json",
-        })
-        js_request = Request.new(url, {
-            "method": "POST",
-            "headers": js_headers,
-            "body": _json.dumps(payload),
-        })
-        response = await fetch(js_request)
-        if not response.ok:
-            logger.error("Resend API error: status=%s", response.status)
-            return False
-        logger.info("Email sent via Resend API: to=%s subject='%s'", to, subject)
+        async with httpx.AsyncClient(timeout=httpx.Timeout(15.0)) as client:
+            response = await client.post(
+                "https://api.resend.com/emails", headers=headers, json=payload,
+            )
+        response.raise_for_status()
+        logger.info("Email sent via Resend REST API: to=%s subject=%r", payload["to"], subject)
         return True
-    except ImportError:
-        # Fallback for local development (non-Workers environment)
-        try:
-            import httpx
-            async with httpx.AsyncClient() as client:
-                response = await client.post(url, headers=headers, json=payload)
-                response.raise_for_status()
-                logger.info("Email sent via Resend API (httpx): to=%s subject='%s'", to, subject)
-                return True
-        except Exception as exc:
-            logger.error("Failed to send email via Resend API: to=%s error=%s", to, exc)
-            return False
-    except Exception as exc:
-        logger.error("Failed to send email via Resend API: to=%s subject='%s' error=%s", to, subject, exc)
-        return False
-
+    except httpx.HTTPStatusError as exc:
+        logger.error(
+            "Resend REST API rejected email: status=%s to=%s subject=%r",
+            exc.response.status_code, payload["to"], subject,
+        )
+    except httpx.HTTPError:
+        logger.exception("Resend REST API transport error: to=%s subject=%r", payload["to"], subject)
+    except Exception:
+        logger.exception("Unexpected Resend REST API error: to=%s subject=%r", payload["to"], subject)
+    return False
 
 async def send_notification(subject: str, html: str) -> bool:
     """Send a notification email to the configured NOTIFY_EMAIL address."""

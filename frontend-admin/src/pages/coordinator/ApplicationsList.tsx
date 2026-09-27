@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { coordinatorApi } from "@/lib/api";
+import { getApplicationId } from "@/lib/applicationId";
 import { Search, Filter, ChevronLeft, ChevronRight } from "lucide-react";
 import { SectionLoading } from "@shared/ui/LoadingStates";
 import { ErrorState, EmptyState } from "@shared/ui/FeedbackStates";
@@ -77,15 +78,22 @@ export default function CoordApplicationsList({ type = "internship" }: { type?: 
           <th className="px-5 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wider">Date</th>
           <th className="px-5 py-3"></th>
         </tr></thead><tbody className="divide-y divide-gray-50">
-          {filtered.map((a) => (
-            <tr key={a.id as string} className="hover:bg-gray-50/50">
+          {filtered.map((a, index) => {
+            const applicationId = getApplicationId(a, `coordinator ${type} applications`);
+            return (
+            <tr key={applicationId ?? `malformed-${index}`} className="hover:bg-gray-50/50">
               <td className="px-5 py-3.5"><p className="font-medium text-gray-800">{a.full_name as string}</p><p className="text-xs text-gray-400">{a.email as string}</p></td>
               <td className="px-5 py-3.5 text-gray-600 capitalize">{type === "internship" ? (a.domain_slug as string)?.replace(/-/g, " ") : a.position as string}</td>
               <td className="px-5 py-3.5"><span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${statusColors[a.status as string] || "bg-gray-100 text-gray-600"}`}>{(a.status as string)?.replace("_", " ")}</span></td>
               <td className="px-5 py-3.5 text-gray-400 text-xs">{new Date(a.created_at as string).toLocaleDateString()}</td>
-              <td className="px-5 py-3.5"><Link to={`${basePath}/${a.id}`} className="text-xs font-semibold text-brand-blue hover:underline">View</Link></td>
+              <td className="px-5 py-3.5">{applicationId ? (
+                <Link to={`${basePath}/${applicationId}`} className="text-xs font-semibold text-brand-blue hover:underline">View</Link>
+              ) : (
+                <span className="text-xs font-semibold text-gray-400" title="This record is missing its application ID">Unavailable</span>
+              )}</td>
             </tr>
-          ))}
+            );
+          })}
         </tbody></table></div>}
         {total > limit && (
           <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100">

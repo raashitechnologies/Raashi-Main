@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { adminApi } from "@/lib/api";
+import { getApplicationId } from "@/lib/applicationId";
 import { Search, Filter, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import { SectionLoading } from "@shared/ui/LoadingStates";
 import { ErrorState, EmptyState } from "@shared/ui/FeedbackStates";
@@ -116,8 +117,10 @@ export default function InternshipApplications() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {filtered.map((app) => (
-                  <tr key={app.id} className="hover:bg-gray-50/50 transition-colors">
+                {filtered.map((app, index) => {
+                  const applicationId = getApplicationId(app, "admin internship applications");
+                  return (
+                  <tr key={applicationId ?? `malformed-${index}`} className="hover:bg-gray-50/50 transition-colors">
                     <td className="px-5 py-3.5">
                       <p className="font-medium text-gray-800">{app.full_name}</p>
                       <p className="text-xs text-gray-400">{app.email}</p>
@@ -132,14 +135,19 @@ export default function InternshipApplications() {
                     <td className="px-5 py-3.5 text-gray-400 text-xs">{new Date(app.created_at).toLocaleDateString()}</td>
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-3">
-                        <Link to={`/admin/internship-applications/${app.id}`} className="text-xs font-semibold text-brand-blue hover:underline">View</Link>
-                        <button onClick={() => handleDelete(app.id)} className="text-red-500 hover:text-red-600 transition-colors" title="Delete application">
+                        {applicationId ? (
+                          <Link to={`/admin/internship-applications/${applicationId}`} className="text-xs font-semibold text-brand-blue hover:underline">View</Link>
+                        ) : (
+                          <span className="text-xs font-semibold text-gray-400" title="This record is missing its application ID">Unavailable</span>
+                        )}
+                        <button onClick={() => applicationId && handleDelete(applicationId)} disabled={!applicationId} className="text-red-500 hover:text-red-600 transition-colors disabled:cursor-not-allowed disabled:opacity-40" title="Delete application">
                           <Trash2 size={16} />
                         </button>
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

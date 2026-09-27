@@ -13,7 +13,6 @@ from app.schemas import CareerApplicationOut, CareerApplicationCreate
 from app.core.validators import sanitize_filename, validate_file_magic_bytes
 from app.schemas.policies import DocumentType, Audience
 from datetime import datetime, timezone
-import asyncio
 import logging
 
 router = APIRouter(prefix="/careers", tags=["careers"])
@@ -172,20 +171,24 @@ async def apply_career(
             detail="Unable to submit your application right now. Please try again.",
         ) from exc
 
-    from app.services.email_service import send_career_notification, send_application_thank_you_email
-    await send_career_notification(
-        full_name=full_name,
-        email=email,
-        phone=phone,
-        position=position,
-        portfolio_url=portfolio_url,
-        message=message,
-    )
+    # D1 (and any resume upload) has succeeded. Email is best-effort only.
+    try:
+        from app.services.email_service import send_application_thank_you_email, send_career_notification
 
-    await send_application_thank_you_email(
-        to_email=email,
-        applicant_name=full_name,
-        application_type="career",
-    )
+        await send_career_notification(
+            full_name=full_name,
+            email=email,
+            phone=phone,
+            position=position,
+            portfolio_url=portfolio_url,
+            message=message,
+        )
+        await send_application_thank_you_email(
+            to_email=email,
+            applicant_name=full_name,
+            application_type="career",
+        )
+    except Exception:
+        logger.exception("Career notification email failed after application persistence: id=%s", doc_id)
 
     return CareerApplicationOut(id=doc_id)

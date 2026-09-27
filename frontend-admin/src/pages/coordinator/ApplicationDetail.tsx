@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { coordinatorApi, getResumeUrl } from "@/lib/api";
+import { coordinatorApi } from "@/lib/api";
 import { ArrowLeft, Download, Send, User, Mail, Phone, BookOpen, Calendar, MapPin, MessageSquare } from "lucide-react";
 import { PageLoading } from "@shared/ui/LoadingStates";
 import { ErrorState, EmptyState } from "@shared/ui/FeedbackStates";
@@ -106,15 +106,13 @@ export default function CoordApplicationDetail({ type = "internship" }: { type?:
           {(Boolean(app.resume_url) || Boolean(app.resume_object_key)) && (
             <div className="pt-3 border-t border-gray-100">
               <button
+                type="button"
                 onClick={async () => {
                   try {
-                    const fetcher = type === "internship" ? coordinatorApi.getInternshipResumeUrl : coordinatorApi.getCareerResumeUrl;
-                    const res = await fetcher(id as string);
-                    if (res.data.legacy) {
-                      window.open(getResumeUrl(res.data.url), "_blank");
-                    } else {
-                      window.location.href = res.data.url;
-                    }
+                    const download = type === "internship"
+                      ? coordinatorApi.downloadInternshipResume
+                      : coordinatorApi.downloadCareerResume;
+                    await download(id as string);
                   } catch (err: any) {
                     setMsg(normalizeApiError(err).message || "Failed to download resume");
                     setTimeout(() => setMsg(""), 3000);

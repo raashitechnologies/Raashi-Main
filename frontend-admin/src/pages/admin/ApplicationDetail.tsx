@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { adminApi, getResumeUrl } from "@/lib/api";
+import { adminApi } from "@/lib/api";
 import { ArrowLeft, Download, Send, User, Mail, Phone, BookOpen, Calendar, MapPin, MessageSquare, ShieldCheck, FileText } from "lucide-react";
 import { PageLoading } from "@shared/ui/LoadingStates";
 import { ErrorState, EmptyState } from "@shared/ui/FeedbackStates";
@@ -132,15 +132,13 @@ export default function ApplicationDetail({ type = "internship" }: { type?: "int
           {(Boolean(app.resume_url) || Boolean(app.resume_object_key)) && (
             <div className="pt-3 border-t border-gray-100">
               <button
+                type="button"
                 onClick={async () => {
                   try {
-                    const fetcher = type === "internship" ? adminApi.getInternshipResumeUrl : adminApi.getCareerResumeUrl;
-                    const res = await fetcher(id as string);
-                    if (res.data.legacy) {
-                      window.open(getResumeUrl(res.data.url), "_blank");
-                    } else {
-                      window.location.href = res.data.url;
-                    }
+                    const download = type === "internship"
+                      ? adminApi.downloadInternshipResume
+                      : adminApi.downloadCareerResume;
+                    await download(id as string);
                   } catch (err: any) {
                     setMsg(normalizeApiError(err).message || "Failed to download resume");
                     setTimeout(() => setMsg(""), 3000);
