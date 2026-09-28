@@ -278,8 +278,11 @@ export const adminApi = {
 
   // Jobs
   listJobs: () => api.get("/admin/jobs"),
+  getJob: (id: string) => api.get(`/admin/jobs/${id}`),
   createJob: (data: Record<string, unknown>) => api.post("/admin/jobs", data),
   updateJob: (id: string, data: Record<string, unknown>) => api.put(`/admin/jobs/${id}`, data),
+  setJobStatus: (id: string, is_active: boolean) =>
+    api.patch(`/admin/jobs/${id}/status`, { is_active }),
   deleteJob: (id: string) => api.delete(`/admin/jobs/${id}`),
 
   // Career Applications

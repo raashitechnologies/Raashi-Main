@@ -25,7 +25,7 @@ from app.services.indexnow import trigger_indexnow_background
 from app.schemas import (
     DomainCreate, DomainUpdate, ContactStatusUpdate,
     ApplicationStatusUpdate, ScreeningRemarkCreate,
-    JobOpeningCreate, JobOpeningUpdate,
+    JobOpeningCreate, JobOpeningUpdate, JobStatusUpdate,
     InternshipListingCreate, InternshipListingUpdate,
     UserCreate, UserUpdate, UserOut,
     WebsiteContentUpdate,
@@ -687,9 +687,22 @@ async def list_jobs(
     current_user: dict = Depends(admin_dep),
     repo: JobOpeningRepository = Depends(get_job_repo),
 ):
+    skip, limit = cap_pagination(skip, limit)
     jobs = await repo.get_all(skip=skip, limit=limit)
     total = await repo.count()
-    return {"jobs": jobs, "total": total}
+    return {"jobs": jobs, "total": total, "skip": skip, "limit": limit}
+
+
+@router.get("/jobs/{job_id}", summary="Get a single job opening (admin view)")
+async def get_job(
+    job_id: str,
+    current_user: dict = Depends(admin_dep),
+    repo: JobOpeningRepository = Depends(get_job_repo),
+):
+    job = await repo.get_by_id(job_id)
+    if not job:
+        raise HTTPException(404, "Job opening not found")
+    return {"job": job}
 
 
 @router.post("/jobs", status_code=status.HTTP_201_CREATED, summary="Create job opening")
@@ -702,8 +715,15 @@ async def create_job(
     audit: AuditLogRepository = Depends(get_audit_repo),
 ):
     job_id = await repo.create(body.model_dump())
-    await audit.log(current_user["id"], current_user["email"], "create", "careers", job_id, f"Created job: {body.title}")
-    return {"id": job_id, "status": "created"}
+    await audit.log(
+        current_user["id"], current_user["email"],
+        "create", "careers", job_id, f"Created job: {body.title}"
+    )
+    # Return the canonical job so the frontend can sync without a second request
+    job = await repo.get_by_id(job_id)
+    if not job:
+        raise HTTPException(500, "Job was created but could not be read back")
+    return {"status": "created", "job": job}
 
 
 @router.put("/jobs/{job_id}", summary="Update job opening")
@@ -716,20 +736,57 @@ async def update_job(
     repo: JobOpeningRepository = Depends(get_job_repo),
     audit: AuditLogRepository = Depends(get_audit_repo),
 ):
-    data = body.model_dump(exclude_none=True)
+    # exclude_unset=True: only fields the client explicitly sent are mutated.
+    # This prevents an omitted field from silently wiping an existing value.
+    data = body.model_dump(exclude_unset=True)
     if not data:
         raise HTTPException(400, "No fields to update")
-    try:
-        success = await repo.update(job_id, data)
-    except ValueError:
-        raise HTTPException(400, "Invalid job ID format")
+    # Verify the job exists before attempting mutation
+    existing = await repo.get_by_id(job_id)
+    if not existing:
+        raise HTTPException(404, "Job opening not found")
+    success = await repo.update(job_id, data)
     if not success:
         raise HTTPException(404, "Job opening not found")
-    await audit.log(current_user["id"], current_user["email"], "update", "careers", job_id)
-    return {"status": "updated"}
+    await audit.log(
+        current_user["id"], current_user["email"],
+        "update", "careers", job_id, f"Updated job fields: {', '.join(data.keys())}"
+    )
+    # Return the canonical updated job
+    job = await repo.get_by_id(job_id)
+    if not job:
+        raise HTTPException(500, "Job was updated but could not be read back")
+    return {"status": "updated", "job": job}
 
 
-@router.delete("/jobs/{job_id}", summary="Deactivate job opening")
+@router.patch("/jobs/{job_id}/status", summary="Close or reopen a job opening")
+@limiter.limit(get_settings().RATE_LIMIT_ADMIN)
+async def update_job_status(
+    job_id: str,
+    body: JobStatusUpdate,
+    request: Request,
+    current_user: dict = Depends(admin_dep),
+    repo: JobOpeningRepository = Depends(get_job_repo),
+    audit: AuditLogRepository = Depends(get_audit_repo),
+):
+    """Set is_active=true (reopen) or is_active=false (close) without deleting."""
+    existing = await repo.get_by_id(job_id)
+    if not existing:
+        raise HTTPException(404, "Job opening not found")
+    success = await repo.set_status(job_id, body.is_active)
+    if not success:
+        raise HTTPException(404, "Job opening not found")
+    action = "reopen" if body.is_active else "close"
+    await audit.log(
+        current_user["id"], current_user["email"],
+        action, "careers", job_id,
+        f"{'Reopened' if body.is_active else 'Closed'} job: {existing.get('title', job_id)}"
+    )
+    job = await repo.get_by_id(job_id)
+    return {"status": action + "d", "job": job}
+
+
+@router.delete("/jobs/{job_id}", summary="Permanently delete job opening")
 @limiter.limit(get_settings().RATE_LIMIT_ADMIN)
 async def delete_job(
     job_id: str,
@@ -738,14 +795,19 @@ async def delete_job(
     repo: JobOpeningRepository = Depends(get_job_repo),
     audit: AuditLogRepository = Depends(get_audit_repo),
 ):
-    try:
-        success = await repo.delete(job_id)
-    except ValueError:
-        raise HTTPException(400, "Invalid job ID format")
+    """Hard-delete: permanently removes the job from D1. Use close/reopen for soft lifecycle."""
+    existing = await repo.get_by_id(job_id)
+    if not existing:
+        raise HTTPException(404, "Job opening not found")
+    success = await repo.hard_delete(job_id)
     if not success:
         raise HTTPException(404, "Job opening not found")
-    await audit.log(current_user["id"], current_user["email"], "deactivate", "careers", job_id)
-    return {"status": "deactivated"}
+    await audit.log(
+        current_user["id"], current_user["email"],
+        "delete", "careers", job_id,
+        f"Permanently deleted job: {existing.get('title', job_id)}"
+    )
+    return {"status": "deleted", "id": job_id}
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

@@ -427,16 +427,52 @@ class CareerRepository:
 class JobOpeningRepository:
     def __init__(self, db: Any):
         self.db = db
-        
+
     def _parse(self, row: dict) -> dict:
-        return _parse_json_fields(row, ["requirements_json", "responsibilities_json"])
+        """Normalize a raw D1 row to a canonical JobOpening dict.
+
+        - requirements_json / responsibilities_json  -> requirements / responsibilities (list[str])
+        - is_active (D1 integer 0/1)                 -> bool
+        - created_at                                  -> also exposed as posted_at
+        """
+        if not row:
+            return row
+        result = dict(row)
+
+        # Parse JSON array columns
+        for raw_col, clean_key in (
+            ("requirements_json", "requirements"),
+            ("responsibilities_json", "responsibilities"),
+        ):
+            if raw_col in result:
+                try:
+                    parsed = json.loads(result.pop(raw_col) or "[]")
+                    result[clean_key] = parsed if isinstance(parsed, list) else []
+                except Exception:
+                    result[clean_key] = []
+
+        # Normalize D1 integer boolean
+        if "is_active" in result:
+            result["is_active"] = bool(result["is_active"])
+
+        # Expose created_at under the product-facing alias
+        result["posted_at"] = result.get("created_at")
+
+        return result
 
     async def get_active(self) -> list[dict]:
-        res = await self.db.prepare("SELECT * FROM job_openings WHERE is_active = 1 ORDER BY created_at DESC").all()
+        res = await self.db.prepare(
+            "SELECT * FROM job_openings WHERE is_active = 1 "
+            "ORDER BY updated_at DESC, created_at DESC"
+        ).all()
         return [self._parse(r) for r in res["results"]]
 
     async def get_all(self, skip: int = 0, limit: int = 50) -> list[dict]:
-        res = await self.db.prepare(f"SELECT * FROM job_openings ORDER BY created_at DESC LIMIT {limit} OFFSET {skip}").all()
+        res = await self.db.prepare(
+            f"SELECT * FROM job_openings "
+            f"ORDER BY updated_at DESC, created_at DESC "
+            f"LIMIT {limit} OFFSET {skip}"
+        ).all()
         return [self._parse(r) for r in res["results"]]
 
     async def count(self) -> int:
@@ -444,53 +480,77 @@ class JobOpeningRepository:
         return row["c"] if row else 0
 
     async def get_by_id(self, job_id: str) -> Optional[dict]:
-        row = await self.db.prepare("SELECT * FROM job_openings WHERE id = ?").bind(job_id).first()
+        row = await self.db.prepare(
+            "SELECT * FROM job_openings WHERE id = ?"
+        ).bind(job_id).first()
         return self._parse(row) if row else None
 
     async def create(self, data: dict) -> str:
         new_id = data.get("id") or generate_id()
         now = now_iso()
-        
+        # Convert Python bool to D1 integer
+        is_active = int(data.get("is_active", True))
+
         await self.db.prepare("""
-            INSERT INTO job_openings 
-            (id, title, department, location, type, experience, description, 
+            INSERT INTO job_openings
+            (id, title, department, location, type, experience, description,
              requirements_json, responsibilities_json, is_active, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """).bind(
             new_id, data.get("title"), data.get("department"), data.get("location"),
             data.get("type"), data.get("experience"), data.get("description"),
-            json.dumps(data.get("requirements", [])), json.dumps(data.get("responsibilities", [])),
-            data.get("is_active", 1), now, now
+            json.dumps(data.get("requirements", [])),
+            json.dumps(data.get("responsibilities", [])),
+            is_active, now, now
         ).run()
         return new_id
 
     async def update(self, job_id: str, data: dict) -> bool:
         updates = []
         binds = []
-        for field in ["title", "department", "location", "type", "experience", "description", "is_active"]:
+        for field in ["title", "department", "location", "type", "experience", "description"]:
             if field in data:
                 updates.append(f"{field} = ?")
                 binds.append(data[field])
-                
+
+        if "is_active" in data:
+            updates.append("is_active = ?")
+            binds.append(int(bool(data["is_active"])))
+
         for field in ["requirements", "responsibilities"]:
             if field in data:
                 updates.append(f"{field}_json = ?")
                 binds.append(json.dumps(data[field]))
-                
+
         if not updates:
-            return True
-            
+            return True  # no-op is still "success"
+
         updates.append("updated_at = ?")
         binds.append(now_iso())
         binds.append(job_id)
-        
+
         q = f"UPDATE job_openings SET {', '.join(updates)} WHERE id = ?"
         res = await self.db.prepare(q).bind(*binds).run()
         return res.get("meta", {}).get("changes", 0) > 0
 
-    async def delete(self, job_id: str) -> bool:
-        res = await self.db.prepare("UPDATE job_openings SET is_active = 0 WHERE id = ?").bind(job_id).run()
+    async def set_status(self, job_id: str, is_active: bool) -> bool:
+        """Close (is_active=False) or reopen (is_active=True) a job without deleting it."""
+        res = await self.db.prepare(
+            "UPDATE job_openings SET is_active = ?, updated_at = ? WHERE id = ?"
+        ).bind(int(is_active), now_iso(), job_id).run()
         return res.get("meta", {}).get("changes", 0) > 0
+
+    async def hard_delete(self, job_id: str) -> bool:
+        """Permanently remove a job from D1. Cannot be undone."""
+        res = await self.db.prepare(
+            "DELETE FROM job_openings WHERE id = ?"
+        ).bind(job_id).run()
+        return res.get("meta", {}).get("changes", 0) > 0
+
+    # Kept for backward-compat; callers in admin.py now use hard_delete / set_status
+    async def delete(self, job_id: str) -> bool:
+        """Alias for hard_delete — legacy callers."""
+        return await self.hard_delete(job_id)
 
 
 class UserRepository:

@@ -475,7 +475,26 @@ class JobOpeningOut(BaseModel):
     type: str
     experience: Optional[str] = None
     description: str
-    posted_at: datetime
+    requirements: list[str] = Field(default_factory=list)
+    responsibilities: list[str] = Field(default_factory=list)
+    is_active: bool
+    posted_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+
+def _sanitize_str_list(items: list) -> list[str]:
+    """Strip whitespace from each item and discard blank strings."""
+    result = []
+    for item in items:
+        if not isinstance(item, str):
+            try:
+                item = str(item)
+            except Exception:
+                continue
+        stripped = sanitize_text(item.strip())
+        if stripped:
+            result.append(stripped)
+    return result
 
 
 class JobOpeningCreate(BaseModel):
@@ -485,12 +504,30 @@ class JobOpeningCreate(BaseModel):
     type: str = Field(min_length=2, max_length=100)
     experience: Optional[str] = Field(None, max_length=200)
     description: str = Field(min_length=10, max_length=5000)
+    requirements: list[str] = Field(default_factory=list, max_length=50)
+    responsibilities: list[str] = Field(default_factory=list, max_length=50)
     is_active: bool = True
 
-    @field_validator("title", "department", "location", "type", "experience", "description")
+    @field_validator("title", "department", "location", "type", "description")
     @classmethod
     def sanitize_text_fields(cls, v: str) -> str:
         return sanitize_text(v)
+
+    @field_validator("experience", mode="before")
+    @classmethod
+    def sanitize_experience(cls, v):
+        if v is not None:
+            return sanitize_text(v) if isinstance(v, str) else v
+        return v
+
+    @field_validator("requirements", "responsibilities", mode="before")
+    @classmethod
+    def sanitize_list_fields(cls, v):
+        if v is None:
+            return []
+        if not isinstance(v, list):
+            raise ValueError("Must be a list of strings")
+        return _sanitize_str_list(v)
 
 
 class JobOpeningUpdate(BaseModel):
@@ -500,14 +537,29 @@ class JobOpeningUpdate(BaseModel):
     type: Optional[str] = Field(None, min_length=2, max_length=100)
     experience: Optional[str] = Field(None, max_length=200)
     description: Optional[str] = Field(None, min_length=10, max_length=5000)
+    requirements: Optional[list[str]] = None
+    responsibilities: Optional[list[str]] = None
     is_active: Optional[bool] = None
 
     @field_validator("title", "department", "location", "type", "experience", "description", mode="before")
     @classmethod
     def sanitize_optional_text(cls, v):
         if v is not None:
-            return sanitize_text(v)
+            return sanitize_text(v) if isinstance(v, str) else v
         return v
+
+    @field_validator("requirements", "responsibilities", mode="before")
+    @classmethod
+    def sanitize_optional_list(cls, v):
+        if v is None:
+            return v
+        if not isinstance(v, list):
+            raise ValueError("Must be a list of strings")
+        return _sanitize_str_list(v)
+
+
+class JobStatusUpdate(BaseModel):
+    is_active: bool
 
 
 class CareerApplicationCreate(BaseModel):

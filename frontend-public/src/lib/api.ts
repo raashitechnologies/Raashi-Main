@@ -252,11 +252,7 @@ export const adminApi = {
     api.post(`/admin/internship-applications/${id}/remarks`, { remark }),
   deleteInternshipApp: (id: string) => api.delete(`/admin/internship-applications/${id}`),
 
-  // Jobs
-  listJobs: () => api.get("/admin/jobs"),
-  createJob: (data: Record<string, unknown>) => api.post("/admin/jobs", data),
-  updateJob: (id: string, data: Record<string, unknown>) => api.put(`/admin/jobs/${id}`, data),
-  deleteJob: (id: string) => api.delete(`/admin/jobs/${id}`),
+
 
   // Career Applications
   listCareerApps: (params?: Record<string, string | number>) =>
