@@ -58,6 +58,7 @@ build/
 # Testing & Debugging scratch files / scripts
 test_*.py
 **/test_*.py
+!backend/tests/test_domain_cms.py
 patch_*.py
 update_*.py
 doc_*.txt

@@ -11,12 +11,19 @@ async def notify_indexnow(urls: List[str]) -> bool:
     Google does not officially support IndexNow (they have their own Indexing API),
     but submitting to Bing/IndexNow is standard practice for the others.
     """
+    if not urls:
+        logger.info("IndexNow notification skipped: no URLs supplied")
+        return False
+
     settings = get_settings()
 
     host = "raashitech.com"
 
     # Normally this key is a minimum 8 character hexadecimal string.
-    key = getattr(settings, "INDEXNOW_KEY", "b39f8f2b7a2d4808a32a67a5c88b75f7")
+    key = getattr(settings, "INDEXNOW_KEY", None)
+    if not key:
+        logger.info("IndexNow notification skipped: INDEXNOW_KEY is unavailable")
+        return False
 
     indexnow_url = "https://api.indexnow.org/indexnow"
 
@@ -28,24 +35,25 @@ async def notify_indexnow(urls: List[str]) -> bool:
     }
 
     try:
-        # Use Workers-native fetch API
-        from js import fetch, Headers, Request
+        # Use the Python Workers SDK rather than raw JS constructors. In
+        # particular, Headers.new({...}) receives a Python proxy instead of a
+        # JS HeadersInit and can raise the Pyodide "not of type Sequence" error.
+        # workers.fetch performs the supported Python-to-JS header conversion.
+        from workers import fetch
         import json as _json
 
-        js_headers = Headers.new({"Content-Type": "application/json"})
-        js_request = Request.new(indexnow_url, {
-            "method": "POST",
-            "headers": js_headers,
-            "body": _json.dumps(payload),
-        })
-        response = await fetch(js_request)
+        response = await fetch(
+            indexnow_url,
+            method="POST",
+            headers={"Content-Type": "application/json"},
+            body=_json.dumps(payload),
+        )
         if response.status in (200, 202):
-            logger.info(f"Successfully notified IndexNow for {len(urls)} URLs.")
+            logger.info("IndexNow notification succeeded for %s URL(s)", len(urls))
             return True
-        else:
-            body = await response.text()
-            logger.warning(f"IndexNow notification failed. Status: {response.status}, Body: {body}")
-            return False
+        body = await response.text()
+        logger.warning("IndexNow HTTP failure: status=%s body=%s", response.status, body[:500])
+        return False
     except ImportError:
         # Fallback for local development
         try:
@@ -53,16 +61,15 @@ async def notify_indexnow(urls: List[str]) -> bool:
             async with httpx.AsyncClient() as client:
                 response = await client.post(indexnow_url, json=payload, timeout=5.0)
                 if response.status_code in (200, 202):
-                    logger.info(f"Successfully notified IndexNow for {len(urls)} URLs.")
+                    logger.info("IndexNow notification succeeded for %s URL(s)", len(urls))
                     return True
-                else:
-                    logger.warning(f"IndexNow notification failed. Status: {response.status_code}")
-                    return False
+                logger.warning("IndexNow HTTP failure: status=%s", response.status_code)
+                return False
         except Exception as e:
-            logger.error(f"Exception during IndexNow notification: {e}")
+            logger.exception("IndexNow local runtime failure: %s", e)
             return False
     except Exception as e:
-        logger.error(f"Exception during IndexNow notification: {e}")
+        logger.exception("IndexNow Workers runtime/interoperability failure: %s", e)
         return False
 
 
@@ -71,7 +78,13 @@ async def trigger_indexnow_background(urls: List[str]) -> None:
     Notify IndexNow — awaitable function.
 
     NOTE: asyncio.create_task() is not supported on Cloudflare Python Workers.
-    All callers must await this function directly. The network call uses a
-    short timeout (5 s) and swallows errors so it never blocks the response.
+    The current ASGI adapter does not pass request execution contexts through
+    to endpoints, so this is awaited after persistence. notify_indexnow catches
+    every network/runtime error; its result never determines request success.
     """
-    await notify_indexnow(urls)
+    try:
+        await notify_indexnow(urls)
+    except BaseException as exc:
+        # Last-resort isolation for third-party notification code. D1 mutations
+        # and their API responses must survive even unexpected interop failures.
+        logger.exception("IndexNow isolation boundary caught an unexpected failure: %s", exc)

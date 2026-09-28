@@ -86,6 +86,9 @@ class Settings:
         self.PUBLIC_FRONTEND_URL = _binding("PUBLIC_FRONTEND_URL", "https://raashitech.com")
         self.ADMIN_FRONTEND_URL = _binding("ADMIN_FRONTEND_URL", "https://admin.raashitech.com")
         self.API_BASE_URL = _binding("API_BASE_URL", "https://api.raashitech.com")
+        # Optional third-party indexing integration. Its absence is valid and
+        # must never affect CMS persistence.
+        self.INDEXNOW_KEY = _binding("INDEXNOW_KEY")
 
         self.FORCE_HTTPS = _binding("FORCE_HTTPS", "false").lower() in ("true", "1", "yes")
         self.ALLOWED_HOSTS = _binding("ALLOWED_HOSTS")

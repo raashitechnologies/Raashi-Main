@@ -290,17 +290,6 @@ export function normalizeDomain(d: any): Domain {
   const accentClass: string = ACCENT_CLASS_MAP[slug] ?? localFallback?.accentClass ?? "";
 
   const asArray = <T,>(value: unknown, fallback: T[]): T[] => Array.isArray(value) ? value as T[] : fallback;
-  const overviewParagraphs = asArray<string>(d.overview_paragraphs ?? d.overviewParagraphs, localFallback?.overviewParagraphs ?? []);
-  const whatWeOffer: DomainOffer[] = asArray<any>(d.what_we_offer ?? d.whatWeOffer, localFallback?.whatWeOffer ?? []).map(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (o: any) => ({ title: o.title ?? "", description: o.description ?? "" })
-  );
-  const technologies = asArray<string>(d.technologies, localFallback?.technologies ?? []);
-  const applications = asArray<string>(d.applications, localFallback?.applications ?? []);
-  const faqs: DomainFaq[] = asArray<any>(d.faqs, localFallback?.faqs ?? []).map(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (f: any) => ({ question: f.question ?? "", answer: f.answer ?? "" })
-  );
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mapHero = (h: any): DomainHero => ({
@@ -401,11 +390,33 @@ function decodeEntities(text?: string | null): string {
   const rawWhy = d.why_section ?? d.why ?? null;
   const rawInternship = d.internship ?? null;
   const rawFuture = d.future_services ?? d.future ?? null;
-  const rawFaq = d.faq_section ?? (Array.isArray(d.faqs) ? { items: d.faqs } : null);
+  // The canonical API key is `faq_section`. Older deployed workers returned
+  // the same structured section under `faqs`, while much older responses used
+  // `faqs` as a plain array. Accept all three shapes so persisted CMS FAQs are
+  // not silently replaced by static fallbacks before they reach the renderer.
+  const rawFaq = d.faq_section
+    ?? (Array.isArray(d.faqs) ? { items: d.faqs } : d.faqs && typeof d.faqs === "object" ? d.faqs : null);
+
+  // API/D1 structured sections are canonical. Legacy flat fields and local
+  // definitions are outage/backwards-compatibility fallbacks only.
+  const overviewParagraphs = asArray<string>(
+    rawOverview?.paragraphs ?? d.overview_paragraphs ?? d.overviewParagraphs,
+    localFallback?.overviewParagraphs ?? [],
+  );
+  const rawOfferCards = Array.isArray(rawOffer) ? rawOffer : rawOffer?.cards;
+  const whatWeOffer: DomainOffer[] = asArray<any>(
+    rawOfferCards ?? d.what_we_offer ?? d.whatWeOffer,
+    localFallback?.whatWeOffer ?? [],
+  ).map((o: any) => ({ title: o.title ?? "", description: o.description ?? "" }));
+  const technologies = asArray<string>(rawTech?.items ?? d.technologies, localFallback?.technologies ?? []);
+  const applications = asArray<string>(rawApps?.items ?? d.applications, localFallback?.applications ?? []);
+  const faqs: DomainFaq[] = asArray<any>(rawFaq?.items ?? d.faqs, localFallback?.faqs ?? []).map(
+    (f: any) => ({ question: f.question ?? "", answer: f.answer ?? "" }),
+  );
 
   return {
     slug,
-    order: d.order ?? 0,
+    order: d.order ?? localFallback?.order ?? 0,
     name: decodeEntities(d.name || localFallback?.name || ""),
     shortName: decodeEntities(shortName),
     tagline: decodeEntities(d.tagline ?? localFallback?.tagline ?? ""),
@@ -427,6 +438,9 @@ function decodeEntities(text?: string | null): string {
     internship: mapInternship(rawInternship),
     futureServices: mapFutureServices(rawFuture),
     faqSection: mapFaqSection(rawFaq),
+    seo_title: d.seo_title ?? d.seoTitle ?? undefined,
+    seo_description: d.seo_description ?? d.seoDescription ?? undefined,
+    seo_image: d.seo_image ?? d.seoImage ?? undefined,
   };
 }
 

@@ -7,6 +7,14 @@ CREATE TABLE IF NOT EXISTS domains (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     slug TEXT NOT NULL UNIQUE,
+    display_order INTEGER NOT NULL,
+    short_name TEXT NOT NULL,
+    tagline TEXT NOT NULL,
+    description TEXT NOT NULL,
+    accent_color TEXT NOT NULL,
+    seo_title TEXT,
+    seo_description TEXT,
+    seo_image TEXT,
     overview_json TEXT NOT NULL, -- stores image_url, image_gridfs_id/key, description
     hero_json TEXT NOT NULL,     -- title, subtitle
     offers_json TEXT NOT NULL,
@@ -20,6 +28,7 @@ CREATE TABLE IF NOT EXISTS domains (
     updated_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_domains_slug ON domains (slug);
+CREATE INDEX IF NOT EXISTS idx_domains_display_order ON domains (display_order, created_at, id);
 
 -- 2. Users (Admin / Coordinator)
 CREATE TABLE IF NOT EXISTS users (

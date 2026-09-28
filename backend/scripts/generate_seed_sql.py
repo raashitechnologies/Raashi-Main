@@ -29,9 +29,9 @@ def main():
         overview_json = json.dumps(d.get("overview", {}))
         hero_json = json.dumps(d.get("hero", {}))
         
-        # offers
-        offer_cards = d.get("offers") or d.get("offer_section", {}).get("cards", [])
-        offers_json = json.dumps(offer_cards)
+        # Store the complete canonical CMS sections.  Flat legacy arrays are
+        # intentionally not written: the public site reads these structures.
+        offers_json = json.dumps(d.get("offer_section", {}))
         
         tech_json = json.dumps(d.get("tech", d.get("tech_section", {})))
         apps_json = json.dumps(d.get("apps", d.get("apps_section", {})))
@@ -39,15 +39,16 @@ def main():
         internship_json = json.dumps(d.get("internship", {}))
         future_json = json.dumps(d.get("future", d.get("future_services", {})))
         
-        faqs = d.get("faqs") or d.get("faq_section", {}).get("items", [])
-        faqs_json = json.dumps(faqs)
+        faqs_json = json.dumps(d.get("faq_section", {}))
 
         sql = f"""INSERT OR REPLACE INTO domains (
-    id, name, slug, overview_json, hero_json, offers_json,
+    id, name, slug, display_order, short_name, tagline, description, accent_color,
+    seo_title, seo_description, seo_image, overview_json, hero_json, offers_json,
     tech_json, apps_json, why_json, internship_json, future_json, faqs_json,
     created_at, updated_at
 ) VALUES (
-    {sql_escape(domain_id)}, {sql_escape(name)}, {sql_escape(slug)}, {sql_escape(overview_json)}, {sql_escape(hero_json)}, {sql_escape(offers_json)},
+    {sql_escape(domain_id)}, {sql_escape(name)}, {sql_escape(slug)}, {d['order']}, {sql_escape(d['short_name'])}, {sql_escape(d['tagline'])}, {sql_escape(d['description'])}, {sql_escape(d['accent_color'])},
+    NULL, NULL, NULL, {sql_escape(overview_json)}, {sql_escape(hero_json)}, {sql_escape(offers_json)},
     {sql_escape(tech_json)}, {sql_escape(apps_json)}, {sql_escape(why_json)}, {sql_escape(internship_json)}, {sql_escape(future_json)}, {sql_escape(faqs_json)},
     {sql_escape(now)}, {sql_escape(now)}
 );"""

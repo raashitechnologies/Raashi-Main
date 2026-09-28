@@ -464,28 +464,45 @@ function escapeSql(str) {
 }
 
 const now = new Date().toISOString();
+// Metadata is kept alongside this legacy convenience seeder so a fresh D1
+// database has the same canonical columns as the Worker API.
+const cmsMetadata = {
+  "artificial-intelligence": { order: 1, short_name: "Artificial Intelligence", tagline: "Building intelligent systems that learn, reason and solve complex problems using data-driven insights.", description: "We deliver cutting-edge AI and data intelligence solutions that transform raw data into actionable insights.", accent_color: "#0560DF" },
+  "research-innovation": { order: 2, short_name: "Research & Innovation", tagline: "Driving innovation through research, technology development and commercialization of new ideas.", description: "We fuel the next wave of technological breakthroughs through applied research and systematic R&D processes.", accent_color: "#D11753" },
+  "iot-smart-automation": { order: 3, short_name: "IoT & Automation", tagline: "Creating connected and intelligent systems that automate processes and enhance efficiency.", description: "We build comprehensive IoT ecosystems from device firmware to cloud dashboards, enabling smarter environments.", accent_color: "#4D9FFF" },
+  "engineering-design": { order: 4, short_name: "Engineering Design", tagline: "From concept to prototype — we design, simulate and manufacture innovative products with precision.", description: "We provide comprehensive engineering design, simulation, and digital manufacturing services.", accent_color: "#F94F0E" },
+  "education-training": { order: 5, short_name: "Education & Training", tagline: "Empowering students, researchers and institutions with knowledge, skills and consulting support.", description: "We bridge the gap between academic learning and industry requirements through structured training and consultancy.", accent_color: "#F94F0E" },
+};
 const sqlStatements = [
   "-- Seed script with attractive FAQs for Domains in Cloudflare D1"
 ];
 
 for (const d of domains) {
+  const meta = cmsMetadata[d.slug];
   const stmt = `INSERT OR REPLACE INTO domains (
-    id, name, slug, overview_json, hero_json, offers_json,
+    id, name, slug, display_order, short_name, tagline, description, accent_color,
+    seo_title, seo_description, seo_image, overview_json, hero_json, offers_json,
     tech_json, apps_json, why_json, internship_json, future_json, faqs_json,
     created_at, updated_at
   ) VALUES (
     ${escapeSql(d.id)},
     ${escapeSql(d.name)},
     ${escapeSql(d.slug)},
+    ${meta.order},
+    ${escapeSql(meta.short_name)},
+    ${escapeSql(meta.tagline)},
+    ${escapeSql(meta.description)},
+    ${escapeSql(meta.accent_color)},
+    NULL, NULL, NULL,
     ${escapeSql(JSON.stringify(d.overview))},
     ${escapeSql(JSON.stringify(d.hero))},
-    ${escapeSql(JSON.stringify(d.offers))},
+    ${escapeSql(JSON.stringify({ eyebrow: "WHAT WE OFFER", heading: "", cards: d.offers }))},
     ${escapeSql(JSON.stringify(d.tech))},
     ${escapeSql(JSON.stringify(d.apps))},
     ${escapeSql(JSON.stringify(d.why))},
     ${escapeSql(JSON.stringify(d.internship))},
     ${escapeSql(JSON.stringify(d.future))},
-    ${escapeSql(JSON.stringify(d.faqs))},
+    ${escapeSql(JSON.stringify({ eyebrow: "FAQ", contact_heading: "Have more questions?", contact_description: "We're here to help. Reach out and our team will respond within 24 hours.", contact_cta_label: "Contact Us", contact_cta_link: "/contact", items: d.faqs }))},
     ${escapeSql(now)},
     ${escapeSql(now)}
   );`;

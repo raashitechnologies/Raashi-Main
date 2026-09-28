@@ -152,7 +152,7 @@ function fromApi(d: any): DomainEditorState {
     general_name:          d.name          ?? "",
     general_short_name:    d.short_name    ?? "",
     general_tagline:       d.tagline       ?? "",
-    general_order:         d.order         ?? 0,
+    general_order:         d.order         ?? 1,
     general_accent_color:  d.accent_color  ?? "#0560DF",
     hero_eyebrow:           h.eyebrow            ?? "OUR DOMAIN",
     hero_heading:           h.heading            ?? "",
@@ -213,15 +213,9 @@ function toPayload(s: DomainEditorState) {
     internship:    { heading: s.internship_heading, checklist: s.internship_checklist, cta_label: s.internship_cta_label, cta_link: s.internship_cta_link },
     future_services: { enabled: s.future_enabled, heading: s.future_heading, description: s.future_description },
     faq_section: { eyebrow: s.faq_eyebrow, contact_heading: s.faq_contact_heading, contact_description: s.faq_contact_description, contact_cta_label: s.faq_contact_cta_label, contact_cta_link: s.faq_contact_cta_link, items: s.faq_items },
-    // legacy flat fields for backward-compat
-    overview_paragraphs: s.overview_paragraphs,
-    what_we_offer: s.offer_cards,
-    technologies:  s.tech_items,
-    applications:  s.apps_items,
-    faqs:          s.faq_items,
-    seo_title:       s.seo_title       || null,
-    seo_description: s.seo_description || null,
-    seo_image:       s.seo_image       || null,
+    seo_title:       s.seo_title,
+    seo_description: s.seo_description,
+    seo_image:       s.seo_image,
   };
 }
 
@@ -824,7 +818,7 @@ function ActiveSectionEditor({ activeSection, ...props }: { activeSection: Secti
           <div><FieldLabel>Domain Name</FieldLabel><Input value={form.general_name} onChange={v => set("general_name", v)} placeholder="Artificial Intelligence" /></div>
           <Grid2>
             <div><FieldLabel>Short Name</FieldLabel><Input value={form.general_short_name} onChange={v => set("general_short_name", v)} placeholder="AI" /></div>
-            <div><FieldLabel>Display Order</FieldLabel><Input value={String(form.general_order)} onChange={v => set("general_order", parseInt(v) || 0)} type="number" /></div>
+            <div><FieldLabel>Display Order</FieldLabel><Input value={String(form.general_order)} onChange={v => set("general_order", Math.max(1, parseInt(v) || 1))} type="number" /></div>
           </Grid2>
           <div><FieldLabel hint="Short tagline shown in listings and hero fallback.">Tagline</FieldLabel><Input value={form.general_tagline} onChange={v => set("general_tagline", v)} placeholder="A short domain tagline" /></div>
           <div>
@@ -1390,24 +1384,35 @@ export default function DomainEditor() {
     setSaving(true);
     setSaveStatus("idle");
     try {
-      await adminApi.updateDomain(id, toPayload(form));
+      const response = await adminApi.updateDomain(id, toPayload(form));
+      const persisted = response.data?.domain;
+      if (!persisted) {
+        throw new Error("The server did not return the persisted domain.");
+      }
+      // The editor state is only marked clean after it has been replaced with
+      // the canonical entity read back from D1 by the update endpoint.
+      setForm(fromApi(persisted));
+      setDomainMeta({
+        name: persisted.name,
+        short_name: persisted.short_name,
+        slug: persisted.slug,
+        accent_color: persisted.accent_color,
+      });
       refreshPublicDomains();
       setSaveStatus("success");
       setSaveMsg("All changes saved.");
       setIsDirty(false);
-      // Sync domainMeta with any general-section edits
-      setDomainMeta(prev => prev ? {
-        ...prev,
-        name:         form.general_name         || prev.name,
-        short_name:   form.general_short_name   || prev.short_name,
-        accent_color: form.general_accent_color || prev.accent_color,
-      } : prev);
     } catch (err: any) {
       const data = err.response?.data;
-      // Backend returns { code, error, message, fields } for validation errors
-      const fieldErrors = data?.fields ? Object.entries(data.fields).map(([k, v]) => `${k}: ${v}`).join('; ') : null;
+      // FastAPI 422 errors use `detail` entries with a precise `loc`; preserve
+      // that field path instead of collapsing validation into a generic error.
+      const fieldErrors = data?.fields
+        ? Object.entries(data.fields).map(([k, v]) => `${k}: ${v}`).join('; ')
+        : Array.isArray(data?.detail)
+          ? data.detail.map((issue: any) => `${issue.loc?.slice(1).join(".") || "field"}: ${issue.msg}`).join("; ")
+          : null;
       const detail = data?.detail;
-      const msg = fieldErrors || (Array.isArray(detail) ? detail[0]?.msg : (detail ?? data?.message ?? "Save failed."));
+      const msg = fieldErrors || (Array.isArray(detail) ? detail[0]?.msg : (detail ?? data?.message ?? err.message ?? "Save failed."));
       console.error('[DomainEditor] Save failed:', data);
       setSaveStatus("error");
       setSaveMsg(msg || "Save failed. Check console for details.");

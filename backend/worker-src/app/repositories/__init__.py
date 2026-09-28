@@ -29,17 +29,53 @@ def _parse_json_fields(row: dict, json_fields: list[str]) -> dict:
     return result
 
 class DomainRepository:
+    """Persistence boundary for the canonical Domain CMS representation."""
+
+    _JSON_COLUMNS = {
+        "overview": "overview_json",
+        "hero": "hero_json",
+        "offer_section": "offers_json",
+        "tech_section": "tech_json",
+        "apps_section": "apps_json",
+        "why_section": "why_json",
+        "internship": "internship_json",
+        "future_services": "future_json",
+        "faq_section": "faqs_json",
+    }
+    _SCALAR_COLUMNS = {
+        "name": "name",
+        "slug": "slug",
+        "short_name": "short_name",
+        "tagline": "tagline",
+        "description": "description",
+        "accent_color": "accent_color",
+        "order": "display_order",
+        "seo_title": "seo_title",
+        "seo_description": "seo_description",
+        "seo_image": "seo_image",
+    }
+
     def __init__(self, db: Any):
         self.db = db
 
     def _parse(self, row: dict) -> dict:
-        return _parse_json_fields(row, [
-            "overview_json", "hero_json", "offers_json", "tech_json", 
-            "apps_json", "why_json", "internship_json", "future_json", "faqs_json"
-        ])
+        parsed = _parse_json_fields(row, list(self._JSON_COLUMNS.values()))
+        if not parsed:
+            return parsed
+
+        # D1's storage names are deliberately implementation details.  Every
+        # endpoint receives the same long, canonical CMS keys.
+        for api_key, column in self._JSON_COLUMNS.items():
+            stored_key = column.removesuffix("_json")
+            if stored_key in parsed:
+                parsed[api_key] = parsed.pop(stored_key)
+        parsed["order"] = parsed.pop("display_order", None)
+        return parsed
 
     async def get_all(self) -> list[dict]:
-        res = await self.db.prepare("SELECT * FROM domains").all()
+        res = await self.db.prepare(
+            "SELECT * FROM domains ORDER BY display_order ASC, created_at ASC, id ASC"
+        ).all()
         return [self._parse(r) for r in res["results"]]
 
     async def get_all_with_ids(self) -> list[dict]:
@@ -61,16 +97,21 @@ class DomainRepository:
         now = now_iso()
         
         stmt = self.db.prepare("""
-            INSERT INTO domains (id, name, slug, overview_json, hero_json, offers_json, 
-                               tech_json, apps_json, why_json, internship_json, future_json, faqs_json, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO domains (
+                id, name, slug, display_order, short_name, tagline, description,
+                accent_color, seo_title, seo_description, seo_image,
+                overview_json, hero_json, offers_json, tech_json, apps_json,
+                why_json, internship_json, future_json, faqs_json, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """).bind(
-            new_id, data.get("name", ""), data.get("slug", ""),
-            json.dumps(data.get("overview", {})), json.dumps(data.get("hero", {})),
-            json.dumps(data.get("offers", [])), json.dumps(data.get("tech", {})),
-            json.dumps(data.get("apps", {})), json.dumps(data.get("why", {})),
-            json.dumps(data.get("internship", {})), json.dumps(data.get("future", {})),
-            json.dumps(data.get("faqs", [])), now, now
+            new_id, data["name"], data["slug"], data["order"],
+            data["short_name"], data["tagline"], data["description"],
+            data["accent_color"], data.get("seo_title"), data.get("seo_description"), data.get("seo_image"),
+            json.dumps(data.get("overview") or {}), json.dumps(data.get("hero") or {}),
+            json.dumps(data.get("offer_section") or {}), json.dumps(data.get("tech_section") or {}),
+            json.dumps(data.get("apps_section") or {}), json.dumps(data.get("why_section") or {}),
+            json.dumps(data.get("internship") or {}), json.dumps(data.get("future_services") or {}),
+            json.dumps(data.get("faq_section") or {}), now, now,
         )
         await stmt.run()
         return new_id
@@ -78,14 +119,14 @@ class DomainRepository:
     async def update(self, domain_id: str, data: dict) -> bool:
         updates = []
         binds = []
-        for field in ["name", "slug"]:
+        for field, column in self._SCALAR_COLUMNS.items():
             if field in data:
-                updates.append(f"{field} = ?")
+                updates.append(f"{column} = ?")
                 binds.append(data[field])
-        
-        for field in ["overview", "hero", "offers", "tech", "apps", "why", "internship", "future", "faqs"]:
+
+        for field, column in self._JSON_COLUMNS.items():
             if field in data:
-                updates.append(f"{field}_json = ?")
+                updates.append(f"{column} = ?")
                 binds.append(json.dumps(data[field]))
         
         if not updates:

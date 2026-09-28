@@ -197,8 +197,11 @@ async def create_domain(
 ):
     domain_id = await repo.create(body.model_dump())
     await audit.log(current_user["id"], current_user["email"], "create", "domains", domain_id, f"Created domain: {body.name}")
+    domain = await repo.get_by_id_admin(domain_id)
+    # The ASGI adapter does not expose a request execution context to endpoint
+    # code, so this best-effort call is deliberately isolated by the service.
     await trigger_indexnow_background([f"https://raashitech.com/domains/{body.slug}"])
-    return {"id": domain_id, "status": "created"}
+    return {"id": domain_id, "status": "created", "domain": domain}
 
 
 @router.put("/domains/{domain_id}", summary="Update domain")
@@ -211,7 +214,9 @@ async def update_domain(
     repo: DomainRepository = Depends(get_domain_repo),
     audit: AuditLogRepository = Depends(get_audit_repo),
 ):
-    data = body.model_dump(exclude_none=True)
+    # Preserve the distinction between an omitted field (no mutation) and an
+    # explicit null for nullable SEO fields (clear the stored value).
+    data = body.model_dump(exclude_unset=True)
     if not data:
         raise HTTPException(400, "No fields to update")
     # Serialize nested Pydantic sub-models to plain dicts for D1 JSON columns
@@ -227,39 +232,6 @@ async def update_domain(
         raise HTTPException(400, "Invalid domain ID format")
     if not existing:
         raise HTTPException(404, "Domain not found")
-
-    # ── Translate schema-level keys → repository/DB column keys ─────────────
-    # The DB stores sections as {name}_json columns. The repository.update()
-    # expects keys: overview, hero, offers, tech, apps, why, internship, future, faqs.
-    # The Pydantic schema uses: offer_section, tech_section, apps_section,
-    # why_section, future_services, faq_section.
-    SCHEMA_TO_REPO: dict = {
-        "offer_section":   "offers",
-        "tech_section":    "tech",
-        "apps_section":    "apps",
-        "why_section":     "why",
-        "future_services": "future",
-        "faq_section":     "faqs",
-        # overview, hero, internship already match
-    }
-    for schema_key, repo_key in SCHEMA_TO_REPO.items():
-        if schema_key in data:
-            data[repo_key] = data.pop(schema_key)
-
-    # ── Map legacy flat fields → correct DB column equivalents ───────────────
-    # what_we_offer from flat payload goes into offers column only if offer_section wasn't set
-    if "what_we_offer" in data and "offers" not in data:
-        data["offers"] = data.pop("what_we_offer")
-    elif "what_we_offer" in data:
-        data.pop("what_we_offer")  # offers already set from offer_section; discard duplicate
-
-    # faqs flat array goes into faqs column only if faq_section wasn't set
-    # (faq_section was already translated to "faqs" above as a structured dict)
-    # If both exist now, the structured section dict wins; remove any plain list duplicate.
-    # (No conflict possible since SCHEMA_TO_REPO already popped "faq_section" → "faqs",
-    #  so any remaining "faqs" key here is from the flat faq_items list.
-    #  We keep whatever is in data["faqs"] at this point — it will be the section dict
-    #  if faq_section was present, or the flat list otherwise.)
 
     # ── Preserve existing image references in overview and hero ──────────────
     if "overview" in data and isinstance(data["overview"], dict):
@@ -283,12 +255,19 @@ async def update_domain(
     if not success:
         raise HTTPException(404, "Domain not found")
     await audit.log(current_user["id"], current_user["email"], "update", "domains", domain_id)
-    
-    # Notify IndexNow of the updated domain URL
-    if "slug" in existing:
-        await trigger_indexnow_background([f"https://raashitech.com/domains/{existing['slug']}"])
 
-    return {"status": "updated"}
+    # Fetch after the successful D1 mutation so the editor and public API share
+    # one persisted source of truth. IndexNow can never change this outcome.
+    domain = await repo.get_by_id_admin(domain_id)
+    if not domain:  # Defensive: a successful UPDATE must still have a row.
+        raise HTTPException(500, "Domain update could not be read back")
+
+    # No endpoint-level waitUntil is available through the current Python ASGI
+    # adapter. The service catches *all* IndexNow failures, so this remains
+    # ancillary and cannot convert a committed D1 update into an HTTP failure.
+    await trigger_indexnow_background([f"https://raashitech.com/domains/{domain['slug']}"])
+
+    return {"status": "updated", "domain": domain}
 
 
 

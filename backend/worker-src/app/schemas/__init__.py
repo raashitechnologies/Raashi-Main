@@ -1,5 +1,5 @@
 import re
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from typing import Optional, Literal, Annotated
 from pydantic import BeforeValidator
 from datetime import datetime
@@ -43,17 +43,27 @@ from .policies import (
 
 # ── Domain CMS sub-models ────────────────────────────────────────────────────
 
-class DomainOffer(BaseModel):
+class DomainCmsModel(BaseModel):
+    """Strict, plain-text CMS sections shared by create and update requests."""
+    model_config = ConfigDict(extra="forbid")
+
+    @field_validator("*", mode="before")
+    @classmethod
+    def sanitize_cms_text(cls, value):
+        return sanitize_text(value) if isinstance(value, str) else value
+
+
+class DomainOffer(DomainCmsModel):
     title: str
     description: str
 
 
-class DomainFaq(BaseModel):
+class DomainFaq(DomainCmsModel):
     question: str
     answer: str
 
 
-class DomainHero(BaseModel):
+class DomainHero(DomainCmsModel):
     eyebrow: str = "OUR DOMAIN"
     heading: str = ""
     heading_highlight: str = ""
@@ -61,40 +71,50 @@ class DomainHero(BaseModel):
     image_url: Optional[str] = None
     image_gridfs_id: Optional[str] = None
 
+    @field_validator("image_url")
+    @classmethod
+    def validate_image_url(cls, value):
+        return validate_url(value) if value else value
 
-class DomainOverview(BaseModel):
+
+class DomainOverview(DomainCmsModel):
     eyebrow: str = "OVERVIEW"
     heading: str = ""
     paragraphs: list[str] = Field(default_factory=list)
     image_url: Optional[str] = None
     image_gridfs_id: Optional[str] = None
 
+    @field_validator("image_url")
+    @classmethod
+    def validate_image_url(cls, value):
+        return validate_url(value) if value else value
 
-class DomainOfferCard(BaseModel):
+
+class DomainOfferCard(DomainCmsModel):
     title: str
     description: str
 
 
-class DomainOfferSection(BaseModel):
+class DomainOfferSection(DomainCmsModel):
     eyebrow: str = "WHAT WE OFFER"
     heading: str = ""
     cards: list[DomainOfferCard] = Field(default_factory=list)
 
 
-class DomainTechSection(BaseModel):
+class DomainTechSection(DomainCmsModel):
     eyebrow: str = "TECHNOLOGIES WE USE"
     heading: str = "Tools & Frameworks"
     items: list[str] = Field(default_factory=list)
 
 
-class DomainAppsSection(BaseModel):
+class DomainAppsSection(DomainCmsModel):
     eyebrow: str = "APPLICATIONS"
     heading: str = "Industries We Serve"
     description: str = ""
     items: list[str] = Field(default_factory=list)
 
 
-class DomainWhyCard(BaseModel):
+class DomainWhyCard(DomainCmsModel):
     title: str
     description: str = ""
     icon: str = "Check"
@@ -102,32 +122,42 @@ class DomainWhyCard(BaseModel):
     enabled: bool = True
 
 
-class DomainWhySection(BaseModel):
+class DomainWhySection(DomainCmsModel):
     eyebrow: str = "WHY CHOOSE RAASHI?"
     heading: str = "Your Trusted Technology Partner"
     cards: list[DomainWhyCard] = Field(default_factory=list)
 
 
-class DomainInternship(BaseModel):
+class DomainInternship(DomainCmsModel):
     heading: str = "Internship Opportunities"
     checklist: list[str] = Field(default_factory=list)
     cta_label: str = "Apply for Internship"
     cta_link: str = "/apply"
 
+    @field_validator("cta_link")
+    @classmethod
+    def validate_cta_link(cls, value: str) -> str:
+        return validate_url(value)
 
-class DomainFutureServices(BaseModel):
+
+class DomainFutureServices(DomainCmsModel):
     enabled: bool = True
     heading: str = "Expanding Capabilities"
     description: str = ""
 
 
-class DomainFaqSection(BaseModel):
+class DomainFaqSection(DomainCmsModel):
     eyebrow: str = "FAQ"
     contact_heading: str = "Have more questions?"
     contact_description: str = "We're here to help. Reach out and our team will respond within 24 hours."
     contact_cta_label: str = "Contact Us"
     contact_cta_link: str = "/contact"
     items: list[DomainFaq] = Field(default_factory=list)
+
+    @field_validator("contact_cta_link")
+    @classmethod
+    def validate_cta_link(cls, value: str) -> str:
+        return validate_url(value)
 
 
 # ── Domain output / create / update schemas ──────────────────────────────────
@@ -171,11 +201,6 @@ class DomainCreate(BaseModel):
     tagline: str = Field(min_length=2, max_length=500)
     description: str = Field(min_length=10, max_length=2000)
     accent_color: str = Field(min_length=4, max_length=20)
-    overview_paragraphs: list[str] = []
-    what_we_offer: list[DomainOffer] = []
-    technologies: list[str] = []
-    applications: list[str] = []
-    faqs: list[DomainFaq] = []
     # Structured CMS sections
     hero: Optional[DomainHero] = None
     overview: Optional[DomainOverview] = None
@@ -202,24 +227,28 @@ class DomainCreate(BaseModel):
             return sanitize_text(v)
         return v
 
-    @field_validator("overview_paragraphs", "technologies", "applications")
+    @field_validator("seo_image")
     @classmethod
-    def sanitize_string_lists(cls, v: list[str]) -> list[str]:
-        return [sanitize_text(item) for item in v]
+    def validate_seo_image(cls, value):
+        return validate_url(value) if value else value
+
+    @model_validator(mode="after")
+    def validate_cms_size_and_depth(self):
+        data = self.model_dump()
+        if not validate_dict_depth(data):
+            raise ValueError("Domain CMS content is nested too deeply")
+        if len(json.dumps(data, ensure_ascii=False).encode("utf-8")) > MAX_CONTENT_SIZE_BYTES:
+            raise ValueError("Domain CMS content is too large")
+        return self
 
 
 class DomainUpdate(BaseModel):
-    order: Optional[int] = Field(None, ge=0)
+    order: Optional[int] = Field(None, ge=1)
     name: Optional[str] = Field(None, min_length=2, max_length=200)
     short_name: Optional[str] = Field(None, min_length=2, max_length=100)
     tagline: Optional[str] = Field(None, min_length=2, max_length=500)
     description: Optional[str] = Field(None, min_length=10, max_length=2000)
     accent_color: Optional[str] = Field(None, min_length=4, max_length=20)
-    overview_paragraphs: Optional[list[str]] = None
-    what_we_offer: Optional[list[DomainOffer]] = None
-    technologies: Optional[list[str]] = None
-    applications: Optional[list[str]] = None
-    faqs: Optional[list[DomainFaq]] = None
     # Structured CMS sections
     hero: Optional[DomainHero] = None
     overview: Optional[DomainOverview] = None
@@ -234,32 +263,35 @@ class DomainUpdate(BaseModel):
     seo_description: Optional[str] = Field(None, max_length=500)
     seo_image: Optional[str] = Field(None, max_length=1000)
 
-    @field_validator("order", mode="before")
-    @classmethod
-    def coerce_order(cls, v):
-        """Treat order=0 as None (not set) to avoid ge constraint conflicts."""
-        if v == 0:
-            return None
-        return v
-
     @field_validator("name", "short_name", "tagline", "description", "accent_color", "seo_title", "seo_description", "seo_image", mode="before")
     @classmethod
     def sanitize_optional_text(cls, v):
         if v is None:
             return v
         if isinstance(v, str):
-            cleaned = sanitize_text(v) if v else v
-            # Treat empty strings as None so min_length constraints are not triggered
-            # for optional fields that were not meaningfully set.
-            return cleaned if cleaned else None
+            return sanitize_text(v)
         return v
 
-    @field_validator("overview_paragraphs", "technologies", "applications", mode="before")
+    @field_validator("seo_image")
     @classmethod
-    def sanitize_optional_lists(cls, v):
-        if v is not None:
-            return [sanitize_text(item) for item in v]
-        return v
+    def validate_seo_image(cls, value):
+        return validate_url(value) if value else value
+
+    @model_validator(mode="after")
+    def reject_null_non_nullable_fields(self):
+        # `exclude_unset=True` below makes a missing field a no-op.  An explicit
+        # null is only meaningful for nullable SEO fields; rejecting it elsewhere
+        # prevents JSON sections or required metadata being accidentally erased.
+        nullable = {"seo_title", "seo_description", "seo_image"}
+        for field in self.model_fields_set - nullable:
+            if getattr(self, field) is None:
+                raise ValueError(f"{field} cannot be null")
+        data = self.model_dump(exclude_none=True)
+        if not validate_dict_depth(data):
+            raise ValueError("Domain CMS content is nested too deeply")
+        if len(json.dumps(data, ensure_ascii=False).encode("utf-8")) > MAX_CONTENT_SIZE_BYTES:
+            raise ValueError("Domain CMS content is too large")
+        return self
 
 
 # ── Contact schemas ─────────────────────────────────────────────────────────
