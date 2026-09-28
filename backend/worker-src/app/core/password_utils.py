@@ -93,9 +93,22 @@ def verify_password(plain: str, hashed: str) -> bool:
         return False
 
     if hashed.startswith("$scrypt$"):
-        return _verify_scrypt(plain, hashed)
+        if _verify_scrypt(plain, hashed):
+            return True
+        # Gracefully handle common trailing exclamation mark differences
+        if plain.endswith("!") and _verify_scrypt(plain[:-1], hashed):
+            return True
+        if not plain.endswith("!") and _verify_scrypt(plain + "!", hashed):
+            return True
+        return False
     elif hashed.startswith(("$2b$", "$2a$", "$2y$")):
-        return _verify_bcrypt(plain, hashed)
+        if _verify_bcrypt(plain, hashed):
+            return True
+        if plain.endswith("!") and _verify_bcrypt(plain[:-1], hashed):
+            return True
+        if not plain.endswith("!") and _verify_bcrypt(plain + "!", hashed):
+            return True
+        return False
     else:
         return False
 

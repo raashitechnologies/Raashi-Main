@@ -199,6 +199,8 @@ def wire_app(app: FastAPI, settings) -> None:
     # --- Exception handlers ---
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(request: Request, exc: RequestValidationError):
+        # Log full errors for debugging
+        logger.warning("Validation errors for %s %s: %s", request.method, request.url.path, exc.errors())
         fields = {}
         for err in exc.errors():
             field_name = ".".join(str(loc) for loc in err["loc"] if loc not in ("body", "query", "path", "header"))

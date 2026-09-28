@@ -13,6 +13,8 @@ export interface DomainHero {
   heading: string;
   heading_highlight: string;
   description: string;
+  image_url?: string | null;
+  image_gridfs_id?: string | null;
 }
 
 export interface DomainOverview {

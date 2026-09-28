@@ -250,14 +250,14 @@ export const adminApi = {
   createDomain: (data: Record<string, unknown>) => api.post("/admin/domains", data),
   updateDomain: (id: string, data: Record<string, unknown>) => api.put(`/admin/domains/${id}`, data),
   deleteDomain: (id: string) => api.delete(`/admin/domains/${id}`),
-  uploadDomainImage: (id: string, file: File) => {
+  uploadDomainImage: (id: string, file: File, target: "overview" | "hero" = "overview") => {
     const fd = new FormData();
     fd.append("file", file);
-    return api.post(`/admin/domains/${id}/image`, fd, {
+    return api.post(`/admin/domains/${id}/image?target=${target}`, fd, {
       headers: { "Content-Type": "multipart/form-data" },
     });
   },
-  deleteDomainImage: (id: string) => api.delete(`/admin/domains/${id}/image`),
+  deleteDomainImage: (id: string, target: "overview" | "hero" = "overview") => api.delete(`/admin/domains/${id}/image?target=${target}`),
 
   // Internship Listings
   listInternships: () => api.get("/admin/internships"),

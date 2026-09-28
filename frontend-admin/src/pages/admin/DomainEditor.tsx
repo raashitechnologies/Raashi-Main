@@ -34,6 +34,8 @@ interface DomainEditorState {
   hero_heading: string;
   hero_heading_highlight: string;
   hero_description: string;
+  hero_image_url: string | null;
+  hero_image_gridfs_id: string | null;
   // Overview
   overview_eyebrow: string;
   overview_heading: string;
@@ -137,13 +139,15 @@ const ACCENT_CLASS_MAP: Record<string, string> = {
 function fromApi(d: any): DomainEditorState {
   const h  = d.hero             ?? {};
   const ov = d.overview         ?? {};
-  const of_ = d.offer_section   ?? {};
-  const tc = d.tech_section     ?? {};
-  const ap = d.apps_section     ?? {};
-  const wh = d.why_section      ?? {};
-  const ix = d.internship       ?? {};
-  const fs = d.future_services  ?? {};
-  const fq = d.faq_section      ?? {};
+  // Repository exposes short keys (offers, tech, apps, why, future, faqs)
+  // while schema/API may also expose long keys (offer_section, tech_section, etc.)
+  const of_ = d.offer_section   ?? d.offers        ?? {};
+  const tc  = d.tech_section    ?? d.tech          ?? {};
+  const ap  = d.apps_section    ?? d.apps          ?? {};
+  const wh  = d.why_section     ?? d.why           ?? {};
+  const ix  = d.internship      ?? {};
+  const fs  = d.future_services ?? d.future        ?? {};
+  const fq  = d.faq_section     ?? d.faqs          ?? {};
   return {
     general_name:          d.name          ?? "",
     general_short_name:    d.short_name    ?? "",
@@ -154,6 +158,8 @@ function fromApi(d: any): DomainEditorState {
     hero_heading:           h.heading            ?? "",
     hero_heading_highlight: h.heading_highlight  ?? "",
     hero_description:       h.description        ?? d.tagline ?? "",
+    hero_image_url:         h.image_url          ?? d.hero_image ?? d.heroImage ?? null,
+    hero_image_gridfs_id:   h.image_gridfs_id    ?? null,
     overview_eyebrow:       ov.eyebrow           ?? "OVERVIEW",
     overview_heading:       ov.heading           ?? "",
     overview_paragraphs:    ov.paragraphs        ?? d.overview_paragraphs ?? [],
@@ -198,7 +204,7 @@ function toPayload(s: DomainEditorState) {
     tagline:     s.general_tagline,
     order:       s.general_order,
     accent_color: s.general_accent_color,
-    hero: { eyebrow: s.hero_eyebrow, heading: s.hero_heading, heading_highlight: s.hero_heading_highlight, description: s.hero_description },
+    hero: { eyebrow: s.hero_eyebrow, heading: s.hero_heading, heading_highlight: s.hero_heading_highlight, description: s.hero_description, image_url: s.hero_image_url || null, image_gridfs_id: s.hero_image_gridfs_id || null },
     overview: { eyebrow: s.overview_eyebrow, heading: s.overview_heading, paragraphs: s.overview_paragraphs, image_url: s.current_image_url || null, image_gridfs_id: s.current_image_gridfs_id || null },
     offer_section: { eyebrow: s.offer_eyebrow, heading: s.offer_heading, cards: s.offer_cards },
     tech_section:  { eyebrow: s.tech_eyebrow,  heading: s.tech_heading,  items: s.tech_items  },
@@ -238,7 +244,8 @@ function buildPreviewDomain(
     technologies: form.tech_items,
     applications: form.apps_items,
     faqs: form.faq_items,
-    hero: { eyebrow: form.hero_eyebrow, heading: form.hero_heading, heading_highlight: form.hero_heading_highlight, description: form.hero_description },
+    heroImage: form.hero_image_url || undefined,
+    hero: { eyebrow: form.hero_eyebrow, heading: form.hero_heading, heading_highlight: form.hero_heading_highlight, description: form.hero_description, image_url: form.hero_image_url, image_gridfs_id: form.hero_image_gridfs_id },
     overview: { eyebrow: form.overview_eyebrow, heading: form.overview_heading, paragraphs: form.overview_paragraphs, image_url: form.current_image_url, image_gridfs_id: form.current_image_gridfs_id },
     offerSection: { eyebrow: form.offer_eyebrow, heading: form.offer_heading, cards: form.offer_cards },
     techSection:  { eyebrow: form.tech_eyebrow,  heading: form.tech_heading,  items: form.tech_items  },
@@ -443,9 +450,10 @@ function CompactChecklistEditor({ items, onChange, placeholder = "Checklist item
 // IMAGE PANEL (with instant local preview + cleanup)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function ImagePanel({ domainId, domainSlug, accentColor, imageUrl, onImageChange }: {
+function ImagePanel({ domainId, domainSlug, accentColor, imageUrl, onImageChange, target = "overview" }: {
   domainId: string; domainSlug: string; accentColor: string;
   imageUrl: string | null; onImageChange: (url: string | null) => void;
+  target?: "overview" | "hero";
 }) {
   const [uploading, setUploading] = useState(false);
   const [deleting,  setDeleting]  = useState(false);
@@ -468,7 +476,7 @@ function ImagePanel({ domainId, domainSlug, accentColor, imageUrl, onImageChange
 
     setUploading(true);
     try {
-      const res = await adminApi.uploadDomainImage(domainId, file);
+      const res = await adminApi.uploadDomainImage(domainId, file, target);
       const serverUrl = res.data.image_url ?? null;
       URL.revokeObjectURL(objectUrl);
       localUrlRef.current = null;
@@ -483,10 +491,10 @@ function ImagePanel({ domainId, domainSlug, accentColor, imageUrl, onImageChange
   };
 
   const handleDelete = async () => {
-    if (!confirm("Remove the overview image?")) return;
+    if (!confirm(`Remove the ${target} image?`)) return;
     setDeleting(true);
     try {
-      await adminApi.deleteDomainImage(domainId);
+      await adminApi.deleteDomainImage(domainId, target);
       onImageChange(null);
       if (localUrlRef.current) { URL.revokeObjectURL(localUrlRef.current); localUrlRef.current = null; }
     } catch (err: any) {
@@ -510,7 +518,8 @@ function ImagePanel({ domainId, domainSlug, accentColor, imageUrl, onImageChange
       return apiBase.startsWith("http") ? `${apiBase}${url}` : `/api/v1${url}`;
     }
     if (domainSlug && !url.includes("/")) {
-      return apiBase.startsWith("http") ? `${apiBase}/domains/${domainSlug}/image` : `/api/v1/domains/${domainSlug}/image`;
+      // Let's use the actual URL provided by API or fallback.
+      return apiBase.startsWith("http") ? `${apiBase}/domains/${domainSlug}/image?target=${target}` : `/api/v1/domains/${domainSlug}/image?target=${target}`;
     }
     return url;
   };
@@ -843,6 +852,20 @@ function ActiveSectionEditor({ activeSection, ...props }: { activeSection: Secti
           <div><FieldLabel>Heading</FieldLabel><Input value={form.hero_heading} onChange={v => set("hero_heading", v)} placeholder="Artificial Intelligence &" /></div>
           <div><FieldLabel hint="Rendered in the domain accent color.">Heading Highlight</FieldLabel><Input value={form.hero_heading_highlight} onChange={v => set("hero_heading_highlight", v)} placeholder="Data Intelligence" /></div>
           <div><FieldLabel>Description</FieldLabel><Textarea value={form.hero_description} onChange={v => set("hero_description", v)} rows={3} placeholder="Hero description below the headline" /></div>
+          <div>
+            <FieldLabel>Hero Image</FieldLabel>
+            <ImagePanel
+              domainId={domainId}
+              domainSlug={domainSlug}
+              accentColor={accentColor}
+              imageUrl={form.hero_image_url}
+              target="hero"
+              onImageChange={url => {
+                set("hero_image_url", url);
+                if (!url) set("hero_image_gridfs_id", null);
+              }}
+            />
+          </div>
         </div>
       );
 
@@ -1380,9 +1403,14 @@ export default function DomainEditor() {
         accent_color: form.general_accent_color || prev.accent_color,
       } : prev);
     } catch (err: any) {
-      const detail = err.response?.data?.detail;
+      const data = err.response?.data;
+      // Backend returns { code, error, message, fields } for validation errors
+      const fieldErrors = data?.fields ? Object.entries(data.fields).map(([k, v]) => `${k}: ${v}`).join('; ') : null;
+      const detail = data?.detail;
+      const msg = fieldErrors || (Array.isArray(detail) ? detail[0]?.msg : (detail ?? data?.message ?? "Save failed."));
+      console.error('[DomainEditor] Save failed:', data);
       setSaveStatus("error");
-      setSaveMsg(Array.isArray(detail) ? detail[0]?.msg : (detail ?? "Save failed."));
+      setSaveMsg(msg || "Save failed. Check console for details.");
     } finally {
       setSaving(false);
       setTimeout(() => setSaveStatus("idle"), 3500);

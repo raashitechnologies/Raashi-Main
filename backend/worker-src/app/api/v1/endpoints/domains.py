@@ -41,6 +41,7 @@ async def get_domain(slug: str, request: Request, repo: DomainRepository = Depen
 async def get_domain_image(
     slug: str,
     request: Request,
+    target: str = "overview",
     repo: DomainRepository = Depends(get_domain_repo),
 ):
     """Serve the domain overview image from R2. Returns 404 if no image exists."""
@@ -53,11 +54,14 @@ async def get_domain_image(
     if not domain:
         raise HTTPException(status_code=404, detail=f"Domain '{slug}' not found.")
 
-    overview = domain.get("overview") or {}
-    gridfs_id_str = isinstance(overview, dict) and overview.get("image_gridfs_id")
+    if target not in ("overview", "hero"):
+        raise HTTPException(status_code=400, detail="Invalid target")
+
+    section = domain.get(target) or {}
+    gridfs_id_str = isinstance(section, dict) and section.get("image_gridfs_id")
 
     if not gridfs_id_str:
-        raise HTTPException(status_code=404, detail="No image available for this domain.")
+        raise HTTPException(status_code=404, detail=f"No {target} image available for this domain.")
 
     object_key = gridfs_id_str
 

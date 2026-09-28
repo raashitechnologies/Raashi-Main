@@ -4,8 +4,8 @@ Run: python -m app.scripts.seed   (from backend/ directory)
 """
 import asyncio
 # import certifi
-# import os
-# from datetime import datetime, timezone
+import os
+from datetime import datetime, timezone
 import bcrypt
 from app.core.config import get_settings
 
@@ -147,6 +147,7 @@ DOMAINS = [
             {"title": "Emerging Technologies", "description": "Deep-dive research in AI, IoT, robotics, and next-gen computing."},
             {"title": "Product Innovation", "description": "Systematic ideation and product development from concept to prototype."},
             {"title": "Technology Commercialization", "description": "Bridge R&D outcomes to market-ready products."},
+
             {"title": "IP Development", "description": "Intellectual property creation and patent filing guidance."},
             {"title": "Technology Licensing", "description": "Technology licensing agreements and partnerships."},
             {"title": "Academic Collaboration", "description": "Industry-academia partnership programs."},

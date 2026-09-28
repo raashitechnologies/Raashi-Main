@@ -93,6 +93,14 @@ class Settings:
         self.LOG_LEVEL = _binding("LOG_LEVEL", "INFO")
         self.LOG_FORMAT = _binding("LOG_FORMAT", "text")
 
+        # Cloudflare D1 Cloud Configuration
+        self.CF_ACCOUNT_ID = _binding("CF_ACCOUNT_ID") or _binding("CLOUDFLARE_ACCOUNT_ID", "")
+        self.CLOUDFLARE_ACCOUNT_ID = self.CF_ACCOUNT_ID
+        self.CF_API_TOKEN = _binding("CF_API_TOKEN") or _binding("CLOUDFLARE_API_TOKEN", "")
+        self.CLOUDFLARE_API_TOKEN = self.CF_API_TOKEN
+        self.D1_DATABASE_ID = _binding("D1_DATABASE_ID", "")
+        self.USE_CLOUD_D1 = _binding("USE_CLOUD_D1", "true").lower() in ("true", "1", "yes")
+
     @property
     def is_production(self) -> bool:
         return self.ENVIRONMENT == "production"

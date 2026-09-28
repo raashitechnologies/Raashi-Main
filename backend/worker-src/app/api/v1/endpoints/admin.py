@@ -215,7 +215,7 @@ async def update_domain(
     if not data:
         raise HTTPException(400, "No fields to update")
     # Serialize nested Pydantic sub-models to plain dicts for D1 JSON columns
-    for key, val in data.items():
+    for key, val in list(data.items()):
         if hasattr(val, "model_dump"):
             data[key] = val.model_dump()
         elif isinstance(val, list) and val and hasattr(val[0], "model_dump"):
@@ -228,13 +228,53 @@ async def update_domain(
     if not existing:
         raise HTTPException(404, "Domain not found")
 
-    # If overview is being updated, preserve existing image references if not provided
+    # ── Translate schema-level keys → repository/DB column keys ─────────────
+    # The DB stores sections as {name}_json columns. The repository.update()
+    # expects keys: overview, hero, offers, tech, apps, why, internship, future, faqs.
+    # The Pydantic schema uses: offer_section, tech_section, apps_section,
+    # why_section, future_services, faq_section.
+    SCHEMA_TO_REPO: dict = {
+        "offer_section":   "offers",
+        "tech_section":    "tech",
+        "apps_section":    "apps",
+        "why_section":     "why",
+        "future_services": "future",
+        "faq_section":     "faqs",
+        # overview, hero, internship already match
+    }
+    for schema_key, repo_key in SCHEMA_TO_REPO.items():
+        if schema_key in data:
+            data[repo_key] = data.pop(schema_key)
+
+    # ── Map legacy flat fields → correct DB column equivalents ───────────────
+    # what_we_offer from flat payload goes into offers column only if offer_section wasn't set
+    if "what_we_offer" in data and "offers" not in data:
+        data["offers"] = data.pop("what_we_offer")
+    elif "what_we_offer" in data:
+        data.pop("what_we_offer")  # offers already set from offer_section; discard duplicate
+
+    # faqs flat array goes into faqs column only if faq_section wasn't set
+    # (faq_section was already translated to "faqs" above as a structured dict)
+    # If both exist now, the structured section dict wins; remove any plain list duplicate.
+    # (No conflict possible since SCHEMA_TO_REPO already popped "faq_section" → "faqs",
+    #  so any remaining "faqs" key here is from the flat faq_items list.
+    #  We keep whatever is in data["faqs"] at this point — it will be the section dict
+    #  if faq_section was present, or the flat list otherwise.)
+
+    # ── Preserve existing image references in overview and hero ──────────────
     if "overview" in data and isinstance(data["overview"], dict):
         ex_ov = existing.get("overview") or {}
         if not data["overview"].get("image_url") and ex_ov.get("image_url"):
             data["overview"]["image_url"] = ex_ov["image_url"]
         if not data["overview"].get("image_gridfs_id") and ex_ov.get("image_gridfs_id"):
             data["overview"]["image_gridfs_id"] = ex_ov["image_gridfs_id"]
+
+    if "hero" in data and isinstance(data["hero"], dict):
+        ex_hero = existing.get("hero") or {}
+        if not data["hero"].get("image_url") and ex_hero.get("image_url"):
+            data["hero"]["image_url"] = ex_hero["image_url"]
+        if not data["hero"].get("image_gridfs_id") and ex_hero.get("image_gridfs_id"):
+            data["hero"]["image_gridfs_id"] = ex_hero["image_gridfs_id"]
 
     try:
         success = await repo.update(domain_id, data)
@@ -244,11 +284,12 @@ async def update_domain(
         raise HTTPException(404, "Domain not found")
     await audit.log(current_user["id"], current_user["email"], "update", "domains", domain_id)
     
-    # Optional: fetch domain to get slug to notify IndexNow.
+    # Notify IndexNow of the updated domain URL
     if "slug" in existing:
         await trigger_indexnow_background([f"https://raashitech.com/domains/{existing['slug']}"])
 
     return {"status": "updated"}
+
 
 
 @router.delete("/domains/{domain_id}", summary="Delete domain")
@@ -313,6 +354,7 @@ def _validate_image_magic(content: bytes, ext: str) -> bool:
 async def upload_domain_image(
     domain_id: str,
     request: Request,
+    target: str = "overview",
     file: UploadFile = File(...),
     current_user: dict = Depends(admin_dep),
     repo: DomainRepository = Depends(get_domain_repo),
@@ -328,6 +370,9 @@ async def upload_domain_image(
         raise HTTPException(400, "Invalid domain ID format")
     if not domain:
         raise HTTPException(404, "Domain not found")
+
+    if target not in ("overview", "hero"):
+        raise HTTPException(400, "Invalid target")
 
     ext = os.path.splitext(file.filename or "")[1].lower()
     if ext not in _ALLOWED_IMAGE_EXTENSIONS:
@@ -358,12 +403,12 @@ async def upload_domain_image(
 
     from app.services.r2_storage import upload_file, delete_file
     
-    overview = domain.get("overview") or {}
-    existing_gridfs_id = overview.get("image_gridfs_id")
+    section = domain.get(target) or {}
+    existing_gridfs_id = section.get("image_gridfs_id")
     is_replacement = existing_gridfs_id is not None
 
     object_key = f"domains/{domain['slug']}/{uuid.uuid4()}{ext}"
-    image_url = f"/api/v1/domains/{domain['slug']}/image"
+    image_url = f"/api/v1/domains/{domain['slug']}/image?target={target}"
     try:
         # Persist the replacement before deleting the live object. This keeps
         # the existing image available if either downstream operation fails.
@@ -371,7 +416,7 @@ async def upload_domain_image(
             request.scope["env"], content, object_key,
             file.content_type or f"image/{ext.lstrip('.')}",
         )
-        updated = await repo.update_image(domain_id, image_url, object_key)
+        updated = await repo.update_image(domain_id, image_url, object_key, target=target)
         if not updated:
             raise RuntimeError("Domain image metadata update did not affect a row")
     except Exception as exc:
@@ -406,6 +451,7 @@ async def upload_domain_image(
 async def delete_domain_image(
     domain_id: str,
     request: Request,
+    target: str = "overview",
     current_user: dict = Depends(admin_dep),
     repo: DomainRepository = Depends(get_domain_repo),
     audit: AuditLogRepository = Depends(get_audit_repo),
@@ -421,8 +467,11 @@ async def delete_domain_image(
     if not domain:
         raise HTTPException(404, "Domain not found")
 
-    overview = domain.get("overview") or {}
-    gridfs_id = isinstance(overview, dict) and overview.get("image_gridfs_id")
+    if target not in ("overview", "hero"):
+        raise HTTPException(400, "Invalid target")
+
+    section = domain.get(target) or {}
+    gridfs_id = isinstance(section, dict) and section.get("image_gridfs_id")
 
     if gridfs_id:
         from app.services.r2_storage import delete_file
@@ -431,7 +480,7 @@ async def delete_domain_image(
         except Exception as e:
             logger.warning(f"Could not delete domain image R2 file: {e}")
 
-    await repo.remove_image(domain_id)
+    await repo.remove_image(domain_id, target=target)
 
     await audit.log(
         current_user["id"], current_user["email"],
@@ -1096,12 +1145,12 @@ async def dashboard_stats(
     recent_intern_query = await db.prepare(
         "SELECT full_name, email, domain_slug, status, created_at FROM internship_applications ORDER BY created_at DESC LIMIT 5"
     ).all()
-    recent_intern = recent_intern_query.results
+    recent_intern = recent_intern_query["results"]
 
     recent_career_query = await db.prepare(
         "SELECT full_name, email, position, status, created_at FROM career_applications ORDER BY created_at DESC LIMIT 5"
     ).all()
-    recent_career = recent_career_query.results
+    recent_career = recent_career_query["results"]
 
     return {
         "totals": {

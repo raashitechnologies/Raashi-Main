@@ -58,6 +58,8 @@ class DomainHero(BaseModel):
     heading: str = ""
     heading_highlight: str = ""
     description: str = ""
+    image_url: Optional[str] = None
+    image_gridfs_id: Optional[str] = None
 
 
 class DomainOverview(BaseModel):
@@ -207,7 +209,7 @@ class DomainCreate(BaseModel):
 
 
 class DomainUpdate(BaseModel):
-    order: Optional[int] = Field(None, ge=1)
+    order: Optional[int] = Field(None, ge=0)
     name: Optional[str] = Field(None, min_length=2, max_length=200)
     short_name: Optional[str] = Field(None, min_length=2, max_length=100)
     tagline: Optional[str] = Field(None, min_length=2, max_length=500)
@@ -232,11 +234,24 @@ class DomainUpdate(BaseModel):
     seo_description: Optional[str] = Field(None, max_length=500)
     seo_image: Optional[str] = Field(None, max_length=1000)
 
+    @field_validator("order", mode="before")
+    @classmethod
+    def coerce_order(cls, v):
+        """Treat order=0 as None (not set) to avoid ge constraint conflicts."""
+        if v == 0:
+            return None
+        return v
+
     @field_validator("name", "short_name", "tagline", "description", "accent_color", "seo_title", "seo_description", "seo_image", mode="before")
     @classmethod
     def sanitize_optional_text(cls, v):
-        if v is not None:
-            return sanitize_text(v)
+        if v is None:
+            return v
+        if isinstance(v, str):
+            cleaned = sanitize_text(v) if v else v
+            # Treat empty strings as None so min_length constraints are not triggered
+            # for optional fields that were not meaningfully set.
+            return cleaned if cleaned else None
         return v
 
     @field_validator("overview_paragraphs", "technologies", "applications", mode="before")

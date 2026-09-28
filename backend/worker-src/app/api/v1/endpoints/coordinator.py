@@ -97,12 +97,12 @@ async def coordinator_dashboard(
     recent_intern_query = await db.prepare(
         "SELECT full_name, email, domain_slug, status, created_at FROM internship_applications ORDER BY created_at DESC LIMIT 5"
     ).all()
-    recent_intern = recent_intern_query.results
+    recent_intern = recent_intern_query["results"]
 
     recent_career_query = await db.prepare(
         "SELECT full_name, email, position, status, created_at FROM career_applications ORDER BY created_at DESC LIMIT 5"
     ).all()
-    recent_career = recent_career_query.results
+    recent_career = recent_career_query["results"]
 
     return {
         "totals": {
@@ -444,9 +444,9 @@ async def coordinator_reports(
     career_by_status_query = await db.prepare("SELECT status as _id, COUNT(*) as count FROM career_applications GROUP BY status").all()
     intern_by_domain_query = await db.prepare("SELECT domain_slug as _id, COUNT(*) as count FROM internship_applications GROUP BY domain_slug").all()
 
-    intern_by_status = intern_by_status_query.results if intern_by_status_query else []
-    career_by_status = career_by_status_query.results if career_by_status_query else []
-    intern_by_domain = intern_by_domain_query.results if intern_by_domain_query else []
+    intern_by_status = intern_by_status_query["results"] if intern_by_status_query else []
+    career_by_status = career_by_status_query["results"] if career_by_status_query else []
+    intern_by_domain = intern_by_domain_query["results"] if intern_by_domain_query else []
 
     return {
         "internship_by_status": {item["_id"]: item["count"] for item in intern_by_status},

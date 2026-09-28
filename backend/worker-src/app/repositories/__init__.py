@@ -99,28 +99,28 @@ class DomainRepository:
         res = await self.db.prepare(q).bind(*binds).run()
         return res.get("meta", {}).get("changes", 0) > 0
 
-    async def update_image(self, domain_id: str, image_url: str, gridfs_id: str) -> bool:
+    async def update_image(self, domain_id: str, image_url: str, gridfs_id: str, target: str = "overview") -> bool:
         # gridfs_id is used to store R2 key as well for compatibility
         domain = await self.get_by_id(domain_id)
         if not domain:
             return False
         
-        overview = domain.get("overview", {})
-        overview["image_url"] = image_url
-        overview["image_gridfs_id"] = gridfs_id
+        section = domain.get(target, {})
+        section["image_url"] = image_url
+        section["image_gridfs_id"] = gridfs_id
         
-        return await self.update(domain_id, {"overview": overview})
+        return await self.update(domain_id, {target: section})
 
-    async def remove_image(self, domain_id: str) -> bool:
+    async def remove_image(self, domain_id: str, target: str = "overview") -> bool:
         domain = await self.get_by_id(domain_id)
         if not domain:
             return False
             
-        overview = domain.get("overview", {})
-        overview.pop("image_url", None)
-        overview.pop("image_gridfs_id", None)
+        section = domain.get(target, {})
+        section.pop("image_url", None)
+        section.pop("image_gridfs_id", None)
         
-        return await self.update(domain_id, {"overview": overview})
+        return await self.update(domain_id, {target: section})
 
     async def delete(self, domain_id: str) -> bool:
         res = await self.db.prepare("DELETE FROM domains WHERE id = ?").bind(domain_id).run()
