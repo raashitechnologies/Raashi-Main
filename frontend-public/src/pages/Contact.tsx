@@ -158,7 +158,7 @@ export default function Contact() {
         <div className="section-container relative z-10">
           <div className="grid lg:grid-cols-2 gap-10 items-center">
             <div>
-              <h1 className="text-4xl lg:text-5xl font-bold text-white leading-tight mb-5">
+              <h1 className="text-[clamp(1.75rem,5vw,3.5rem)] font-bold text-white leading-tight mb-5">
             <FoldText 
               text="Contact Us —" 
               splitBy="char"
@@ -209,7 +209,7 @@ export default function Contact() {
           <div className="grid lg:grid-cols-2 gap-10">
             {/* Form */}
             <FadeInView direction="left">
-              <div className="bg-white/55 backdrop-blur-xl backdrop-saturate-[160%] border border-white/60 rounded-3xl shadow-glass p-8">
+              <div className="bg-white/55 backdrop-blur-xl backdrop-saturate-[160%] border border-white/60 rounded-3xl shadow-glass p-5 sm:p-8">
                 <h2 className="text-2xl font-bold text-brand-navy mb-1">Send Us a Message</h2>
                 <p className="text-sm text-brand-navy/55 mb-6">We typically respond within 24 hours.</p>
 

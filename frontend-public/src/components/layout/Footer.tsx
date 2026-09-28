@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { Phone, Mail, MapPin } from "lucide-react";
-import { FaLinkedinIn } from "react-icons/fa";
+import { FaLinkedinIn, FaWhatsapp } from "react-icons/fa";
 import { useDomains } from "@/contexts/DomainsProvider";
 import { useContentContext } from "@/contexts/ContentProvider";
 
@@ -15,15 +15,26 @@ const quickLinks = [
 
 const socials = [
   { icon: FaLinkedinIn, label: "LinkedIn", href: "https://www.linkedin.com/in/abhishek-gornale/" },
+  { icon: FaWhatsapp, label: "WhatsApp", href: "https://wa.me/919742419316?text=Hello!%20I'm%20interested%20in%20learning%20more%20about%20Raashi%20Cognitive%20Technologies." },
   { icon: Mail, label: "Gmail", href: "mailto:raashitechnologies@gmail.com" },
 ];
 
-export function Footer() {
+interface FooterProps {
+  /**
+   * When provided (non-home routes), this email is shown in the Contact column
+   * instead of the CMS-sourced default.
+   * When undefined (home route), the CMS email is used — preserving existing home behaviour.
+   */
+  contactEmail?: string;
+}
+
+export function Footer({ contactEmail }: FooterProps) {
   const { domains } = useDomains();
   const { getContent } = useContentContext();
   const contactInfo = getContent("contact_info");
   const phone = contactInfo?.phone || "+91 9742419316";
-  const email = contactInfo?.email || "raashitechnologies@gmail.com";
+  // Use contextual override when provided; otherwise fall back to CMS value
+  const email = contactEmail ?? (contactInfo?.email || "raashitechnologies@gmail.com");
   const address = contactInfo?.address || "69, CTS NO.4482B/67, Shruti Layout, Kanabargi Road, Belgaum Fort, Belgaum – 590016, Karnataka";
   const hours = contactInfo?.hours || "Mon – Sat: 9:00 AM – 6:00 PM\nSunday: Closed";
 

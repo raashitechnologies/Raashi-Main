@@ -110,7 +110,7 @@ export default function Home() {
         </script>
       </SEO>
       {/* ── 1. HERO ── */}
-      <section className="bg-brand-navy min-h-[88vh] relative overflow-hidden" aria-label="Hero">
+      <section className="bg-brand-navy min-h-[80vh] sm:min-h-[88vh] relative overflow-hidden" aria-label="Hero">
         {/* Background glow */}
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute top-1/4 right-1/4 w-[600px] h-[600px] rounded-full opacity-[0.07]"
@@ -133,7 +133,7 @@ export default function Home() {
                 </span>
               </motion.div>
 
-              <h1 className="text-[32px] sm:text-5xl lg:text-7xl font-bold text-white leading-tight mb-6 break-words sm:break-normal">
+              <h1 className="text-[clamp(1.75rem,6vw,4.5rem)] font-bold text-white leading-tight mb-6 break-words">
                 <FoldText 
                   text={hero?.heading || "Transforming Knowledge into"} 
                   splitBy="char"
@@ -165,7 +165,7 @@ export default function Home() {
               <motion.p
                 variants={FadeUp}
                 transition={{ ...transition.standard, delay: 0.1 }}
-                className="text-white/65 text-lg max-w-2xl mb-10 leading-relaxed font-light"
+                className="text-white/65 text-base sm:text-lg max-w-2xl mb-8 sm:mb-10 leading-relaxed font-light"
               >
                 {hero?.description || "Raashi Cognitive Technologies Pvt. Ltd. delivers innovative solutions in Artificial Intelligence, IoT, Smart Automation, 3D Design, Research & Development, and Skill Development to empower businesses and build a smarter future."}
               </motion.p>
@@ -302,7 +302,7 @@ export default function Home() {
 
             {/* Right — stat panel */}
             <FadeInView direction="right" variant="panel3d" className="lg:col-span-1">
-              <div className="bg-brand-navy rounded-3xl p-6 grid grid-cols-1 sm:grid-cols-2 gap-3 h-full">
+              <div className="bg-brand-navy rounded-3xl p-6 grid grid-cols-2 gap-3 h-full">
                 {statsPanel.map(({ icon: Icon, label, sub }) => (
                   <div key={label} className="bg-white/8 rounded-2xl p-5 border border-white/10">
                     <div className="w-10 h-10 rounded-xl bg-brand-blue/20 flex items-center justify-center mb-3">

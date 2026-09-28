@@ -280,7 +280,7 @@ export default function Careers() {
         <div className="section-container relative z-10">
           <Breadcrumb items={[{ label: "Careers" }]} />
           <div className="mt-8 max-w-2xl">
-            <h1 className="text-4xl lg:text-5xl font-bold text-white leading-tight mb-5">
+            <h1 className="text-[clamp(1.75rem,5vw,3.5rem)] font-bold text-white leading-tight mb-5">
               <FoldText 
                 text="Careers at Raashi —" 
                 splitBy="char"
@@ -371,9 +371,9 @@ export default function Careers() {
               {jobs.map((job, i) => (
                 <MotionCard key={job._id || job.id} index={i} total={jobs.length} variant="panel">
                   <div className="bg-[#F1F1EE] rounded-2xl border border-[#E98A3A]/20 p-6 shadow-warm-card hover:shadow-warm-hover transition-shadow">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 min-w-0">
                       <div>
-                        <h3 className="font-bold text-brand-navy text-lg mb-1">{job.title}</h3>
+                        <h3 className="font-bold text-brand-navy text-lg mb-1 break-words">{job.title}</h3>
                         <div className="flex flex-wrap items-center gap-3 text-sm text-brand-navy/55">
                           <span className="flex items-center gap-1"><Briefcase size={13} />{job.department}</span>
                           <span className="flex items-center gap-1"><MapPin size={13} />{job.location}</span>
@@ -384,7 +384,7 @@ export default function Careers() {
                         onClick={() => openApply(job.title)}
                         variant="primary"
                         size="md"
-                        className="shrink-0 shadow-sm"
+                        className="shrink-0 shadow-sm w-full sm:w-auto"
                       >
                         <span className="flex items-center gap-2">
                           View &amp; Apply <ArrowRight size={14} />

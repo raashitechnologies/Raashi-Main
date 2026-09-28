@@ -46,18 +46,42 @@
     scroll-behavior: smooth;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* Prevent any element from causing page-level horizontal scroll */
+    overflow-x: hidden;
+  }
+
+  /* Respect user's motion preference for scroll behaviour */
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
   }
 
   body {
     @apply bg-background text-foreground;
     font-family: 'Inter', 'Plus Jakarta Sans', 'Manrope', sans-serif;
+    /* Prevent body from ever producing horizontal scroll */
+    overflow-x: hidden;
+    /* Allow word wrapping for long strings (emails, URLs, etc.) */
+    overflow-wrap: break-word;
+    word-break: break-word;
   }
 
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
     color: #17285E;
+    /* Allow headings to wrap rather than overflow on small screens */
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
+
+  /* Responsive images: never overflow their container */
+  img, svg, video {
+    max-width: 100%;
+    height: auto;
   }
 }
+
 
 @layer components {
   /* ── Gradient text utilities ── */
@@ -470,6 +494,100 @@
       display: flex;
       align-items: center;
       justify-content: flex-end;
+    }
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   RESPONSIVE UTILITIES — Public Frontend Optimisation
+   These rules are additive corrections to fix real layout issues at specific
+   breakpoints. They do NOT redesign the existing visual identity.
+───────────────────────────────────────────────────────────────────────────── */
+
+@layer utilities {
+  /* ── Back-to-top: disable transition animation for reduced-motion users ── */
+  @media (prefers-reduced-motion: reduce) {
+    #back-to-top {
+      transition: opacity 0.01ms !important;
+    }
+  }
+
+  /* ── Flex children: prevent overflow due to missing min-width: 0 ── */
+  .flex-child-safe {
+    min-width: 0;
+  }
+
+  /* ── Section container: enforce full responsive width ── */
+  .section-container {
+    width: 100%;
+  }
+
+  /* ── Responsive hero: never let min-h-[88vh] create excessive height on tiny screens ── */
+  @media (max-width: 430px) {
+    .hero-section-min-h {
+      min-height: 70vh;
+      min-height: 70dvh;
+    }
+  }
+
+  /* ── Responsive domain panel layout fix: ensure grid cells can shrink ── */
+  .domain-panel-grid {
+    min-width: 0;
+  }
+
+  /* ── Touch target: ensure interactive elements are at least 44×44px ── */
+  .touch-target-min {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* ── Responsive long text: break email/URL strings inside small containers ── */
+  .break-email {
+    overflow-wrap: break-word;
+    word-break: break-all;
+  }
+
+  /* ── Footer: ensure columns don't create horizontal overflow on small phones ── */
+  @media (max-width: 639px) {
+    .footer-col-stack {
+      grid-template-columns: 1fr !important;
+    }
+  }
+
+  /* ── Card grids: make 5-column grid responsive ── */
+  @media (max-width: 639px) {
+    .grid-cols-5-responsive {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (min-width: 640px) and (max-width: 1023px) {
+    .grid-cols-5-responsive {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  /* ── Prevent FoldText from overflowing on very small screens ── */
+  @media (max-width: 375px) {
+    .fold-text-container {
+      font-size: clamp(1.5rem, 8vw, 2rem) !important;
+    }
+  }
+
+  /* ── Form: ensure select/textarea don't overflow on mobile ── */
+  select,
+  textarea,
+  input[type="text"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="url"],
+  input[type="file"] {
+    max-width: 100%;
+  }
+
+  /* ── Responsive stats panel: wrap on mobile instead of overflowing ── */
+  @media (max-width: 639px) {
+    .stats-panel-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
 }

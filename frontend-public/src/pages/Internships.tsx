@@ -104,7 +104,7 @@ export default function Internships() {
             <motion.div variants={FadeUp} transition={transition.standard}>
               <SectionEyebrow light>Internship Program</SectionEyebrow>
             </motion.div>
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white leading-tight mb-6 mt-2">
+            <h1 className="text-[clamp(2rem,5vw,4.5rem)] font-bold text-white leading-tight mb-6 mt-2">
               <FoldText 
                 text="Internship Opportunities for" 
                 splitBy="char"
@@ -191,7 +191,7 @@ export default function Internships() {
             <SectionEyebrow>What You Gain</SectionEyebrow>
             <h2 className="text-3xl font-bold text-brand-navy">Benefits You Will Get</h2>
           </MotionSection>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-5">
             {benefits.map(({ icon: Icon, label, desc }, i) => (
               <MotionCard key={label} index={i} total={benefits.length}>
                 <div className="warm-tile-alt text-center flex flex-col h-full">
@@ -225,7 +225,7 @@ export default function Internships() {
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-brand-royal/15 rounded-full blur-[100px] pointer-events-none" />
         
         <div className="section-container max-w-4xl text-center relative z-10">
-          <FadeInView variant="panel3d" className="bg-white/55 backdrop-blur-xl backdrop-saturate-[160%] border border-white/60 rounded-3xl shadow-glass p-10 lg:p-14">
+          <FadeInView variant="panel3d" className="bg-white/55 backdrop-blur-xl backdrop-saturate-[160%] border border-white/60 rounded-3xl shadow-glass p-6 sm:p-10 lg:p-14">
             <h2 className="text-3xl lg:text-4xl font-bold text-brand-navy mb-4 leading-tight">
               Take the First Step Towards an{" "}
               <span className="text-brand-orange">Exciting Career</span>

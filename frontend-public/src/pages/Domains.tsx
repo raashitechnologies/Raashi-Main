@@ -68,7 +68,7 @@ export default function Domains() {
           <Breadcrumb items={[{ label: "Domains" }]} />
           <div className="mt-8 grid lg:grid-cols-2 gap-10 items-center">
             <div>
-              <h1 className="text-4xl lg:text-5xl font-bold text-white leading-tight mb-5">
+              <h1 className="text-[clamp(1.75rem,5vw,3.5rem)] font-bold text-white leading-tight mb-5">
                 Our <span className="text-brand-orange">Domains</span> —{" "}
                 <FoldText 
                   text="Solutions that Drive Innovation" 
@@ -184,10 +184,10 @@ export default function Domains() {
                 return (
                   <FadeInView key={domain.slug} variant="panel3d" delay={i * 0.04}>
                     <div className="bg-[#F1F1EE] rounded-3xl shadow-warm-card border border-[#E98A3A]/18 overflow-hidden">
-                      <div className="grid lg:grid-cols-2">
+                      <div className="grid lg:grid-cols-2 min-w-0">
                         {/* Image tile */}
                         <div
-                          className={`relative p-10 lg:p-14 flex flex-col justify-center ${!isEven ? "lg:order-2" : ""}`}
+                          className={`relative p-6 sm:p-10 lg:p-14 flex flex-col justify-center min-w-0 ${!isEven ? "lg:order-2" : ""}`}
                           style={{
                             background: `linear-gradient(135deg, ${domain.accentColor}18 0%, ${domain.accentColor}08 100%)`,
                             borderLeft: isEven ? "none" : `4px solid ${domain.accentColor}`,
@@ -235,7 +235,7 @@ export default function Domains() {
                         </div>
 
                         {/* Offer list */}
-                        <div className={`p-8 lg:p-12 ${!isEven ? "lg:order-1" : ""}`}>
+                        <div className={`p-6 sm:p-8 lg:p-12 min-w-0 ${!isEven ? "lg:order-1" : ""}`}>
                           <p className="text-xs font-semibold tracking-widest text-brand-navy/40 uppercase mb-5">
                             What We Offer
                           </p>

@@ -101,7 +101,7 @@ export default function About() {
         <div className="section-container relative z-10">
           <Breadcrumb items={[{ label: "About Us" }]} />
           <div className="mt-8 max-w-3xl">
-            <h1 className="text-4xl lg:text-5xl font-bold text-white leading-tight mb-6">
+            <h1 className="text-[clamp(1.75rem,5vw,3.5rem)] font-bold text-white leading-tight mb-6">
               <FoldText 
                 text={content?.hero_heading || "About Raashi Cognitive Technologies"} 
                 splitBy="char"
@@ -224,7 +224,7 @@ export default function About() {
       {/* Dark stat bar */}
       <section className="bg-[#F5F0E6] py-12">
         <div className="section-container">
-          <div className="flex flex-wrap justify-center gap-x-8 gap-y-6">
+          <div className="flex flex-wrap justify-center gap-x-6 gap-y-5">
             {statItems.map(({ icon: Icon, label, sub }, i) => (
               <MotionCard key={label} index={i} total={statItems.length} variant="panel">
                 <div className="flex items-center gap-3">
