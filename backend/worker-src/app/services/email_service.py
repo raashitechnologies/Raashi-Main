@@ -8,6 +8,7 @@ Gracefully skips if Resend is not configured (development).
 Never raises exceptions to callers — logs errors and returns silently.
 """
 import logging
+from html import escape
 from collections.abc import Sequence
 from typing import Any, Optional
 
@@ -107,6 +108,18 @@ def _status_color(status: str) -> str:
 def _status_label(status: str) -> str:
     """Human-readable status label."""
     return status.replace("_", " ").title()
+
+
+def _contact_status_color(status: str) -> str:
+    """Return a badge colour for a contact-enquiry status."""
+    colors = {
+        "new": "#0d6efd",
+        "in_progress": "#fd7e14",
+        "responded": "#6f42c1",
+        "resolved": "#198754",
+        "closed": "#6c757d",
+    }
+    return colors.get(status.lower(), "#6c757d")
 
 
 # ── Core Send Function ───────────────────────────────────────────────────────
@@ -213,6 +226,52 @@ async def send_contact_notification(
 
     return await send_notification(
         subject=f"[Raashi CT] New Contact Message — {subject}",
+        html=_base_template(content),
+    )
+
+
+async def send_contact_status_update_email(
+    to_email: str,
+    contact_name: str,
+    subject: str,
+    new_status: str,
+) -> bool:
+    """Notify a contact-form sender of a persisted enquiry-status change.
+
+    This deliberately uses contact-enquiry wording rather than the application
+    status template.  It never includes the internal follow-up note.
+    """
+    if not to_email:
+        logger.warning("Cannot send contact status email: contact has no email")
+        return False
+
+    messages = {
+        "new": "Your enquiry has been received and is currently recorded with our team.",
+        "in_progress": "Our team is currently reviewing your enquiry and working on the next steps.",
+        "responded": "Our team has responded to your enquiry. Please check your email or reply to our team if you need further assistance.",
+        "resolved": "Your enquiry has been marked as resolved by our team. If you still need assistance, please contact us again.",
+        "closed": "Your enquiry has been closed by our team. If you have another question or need further assistance, please feel free to contact us again.",
+    }
+    label = _status_label(new_status)
+    color = _contact_status_color(new_status)
+    safe_name = escape(contact_name or "there")
+    safe_subject = escape(subject or "General Enquiry")
+    message = escape(messages.get(new_status.lower(), "Your enquiry status has been updated by our team."))
+
+    content = f"""\
+<h2 style="margin:0 0 16px;color:#1a1a2e;font-size:20px;">Contact Enquiry Status Update</h2>
+<p style="margin:0 0 16px;color:#495057;font-size:15px;line-height:1.6;">Dear <strong>{safe_name}</strong>,</p>
+<p style="margin:0 0 20px;color:#495057;font-size:15px;line-height:1.6;">We have an update regarding your enquiry submitted to Raashi Cognitive Technologies.</p>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-bottom:20px;">
+  {_info_row("Enquiry", safe_subject)}
+</table>
+<div style="display:inline-block;background-color:{color};color:#ffffff;padding:7px 14px;border-radius:999px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:16px;">{escape(label)}</div>
+<p style="margin:0 0 20px;color:#495057;font-size:15px;line-height:1.6;">{message}</p>
+<p style="margin:0;color:#495057;font-size:15px;line-height:1.6;">If you have any further questions, please feel free to contact us.</p>"""
+
+    return await send_email(
+        to=to_email,
+        subject=f"Contact Enquiry Update: {label} — Raashi Cognitive Technologies",
         html=_base_template(content),
     )
 

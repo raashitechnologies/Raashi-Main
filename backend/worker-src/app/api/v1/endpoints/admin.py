@@ -15,7 +15,7 @@ from typing import Optional, Any
 from app.core.config import get_settings
 from app.core.database import get_database
 from app.core.auth import require_role, hash_password
-from app.core.validators import cap_pagination, validate_section_key
+from app.core.validators import ALLOWED_STATUSES_CONTACT, cap_pagination, validate_section_key
 from app.repositories import (
     DomainRepository, ContactRepository, InternshipRepository,
     CareerRepository, JobOpeningRepository, UserRepository,
@@ -959,6 +959,8 @@ async def list_contacts(
     repo: ContactRepository = Depends(get_contact_repo),
 ):
     skip, limit = cap_pagination(skip, limit)
+    if status_filter and status_filter not in ALLOWED_STATUSES_CONTACT:
+        raise HTTPException(400, "Invalid status filter")
     contacts = await repo.get_all(skip=skip, limit=limit, status=status_filter)
     total = await repo.count(status=status_filter)
     return {"contacts": contacts, "total": total, "skip": skip, "limit": limit}
@@ -998,7 +1000,32 @@ async def update_contact_status(
     if body.note:
         await repo.add_follow_up(contact_id, body.note, current_user["id"])
     await audit.log(current_user["id"], current_user["email"], f"status_{body.status}", "contacts", contact_id)
-    return {"status": "updated", "new_status": body.status}
+
+    # D1 is the source of truth. A failed notification must not turn this
+    # committed status update into a failed request.
+    contact = await repo.get_by_id(contact_id)
+    if not contact:
+        logger.error("Updated contact could not be read back: id=%s", contact_id)
+        return {"status": "updated", "new_status": body.status, "contact": None, "notification": "failed"}
+
+    notification = "failed"
+    email = contact.get("email")
+    if email:
+        try:
+            from app.services.email_service import send_contact_status_update_email
+            sent = await send_contact_status_update_email(
+                to_email=email,
+                contact_name=contact.get("full_name") or "",
+                subject=contact.get("subject") or "",
+                new_status=contact.get("status") or body.status,
+            )
+            notification = "sent" if sent else "failed"
+        except Exception:
+            logger.exception("Contact status notification failed after persistence: id=%s", contact_id)
+    else:
+        logger.warning("Contact status notification skipped; missing email: id=%s", contact_id)
+
+    return {"status": "updated", "new_status": contact["status"], "contact": contact, "notification": notification}
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

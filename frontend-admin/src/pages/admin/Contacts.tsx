@@ -7,10 +7,12 @@ import { normalizeApiError } from "@shared/lib/apiError";
 
 const statusColors: Record<string, string> = {
   new: "bg-sky-100 text-sky-700", in_progress: "bg-amber-100 text-amber-700",
+  responded: "bg-violet-100 text-violet-700",
   resolved: "bg-emerald-100 text-emerald-700", closed: "bg-gray-100 text-gray-600",
 };
 
-const statusOptions = ["new", "in_progress", "resolved", "closed"];
+const statusOptions = ["new", "in_progress", "responded", "resolved", "closed"];
+const statusLabel = (status: string) => status.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 
 export default function Contacts() {
   const [contacts, setContacts] = useState<Array<Record<string, unknown>>>([]);
@@ -21,6 +23,7 @@ export default function Contacts() {
   const [newStatus, setNewStatus] = useState("");
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   const load = () => {
     setLoading(true);
@@ -36,14 +39,30 @@ export default function Contacts() {
   useEffect(() => { load(); }, [statusFilter]);
 
   const updateStatus = async (id: string) => {
-    if (!newStatus) return;
+    if (!newStatus) {
+      setError("Please select a status.");
+      return;
+    }
     try {
-      await adminApi.updateContactStatus(id, newStatus, note || undefined);
+      setError("");
+      const response = await adminApi.updateContactStatus(id, newStatus, note || undefined);
+      const updatedContact = response.data.contact;
+      if (updatedContact) {
+        setContacts((current) => current.map((contact) =>
+          contact.id === id ? updatedContact : contact,
+        ));
+      }
       setSelectedId(null);
+      setNewStatus("");
       setNote("");
-      load();
+      const statusLabelText = statusLabel(response.data.new_status || newStatus);
+      setSuccess(
+        response.data.notification === "sent"
+          ? `Status updated to ${statusLabelText}. The contact was notified by email.`
+          : `Status updated to ${statusLabelText}, but the email notification could not be delivered.`,
+      );
     } catch (e) {
-      alert(normalizeApiError(e).message || "Failed to update status");
+      setError(normalizeApiError(e).message || "Failed to update status");
     }
   };
 
@@ -52,11 +71,12 @@ export default function Contacts() {
   return (
     <div className="space-y-5">
       <div><h1 className="text-2xl font-bold text-gray-900">Contact Messages</h1><p className="text-sm text-gray-500 mt-1">{total} total enquiries</p></div>
+      {success && <div role="status" className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{success}</div>}
       <div className="flex items-center gap-2">
         {["", ...statusOptions].map((s) => (
           <button key={s} onClick={() => setStatusFilter(s)}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${statusFilter === s ? "bg-brand-blue text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
-            {s || "All"}{s === "" ? ` (${total})` : ""}
+            {s ? statusLabel(s) : "All"}{s === "" ? ` (${total})` : ""}
           </button>
         ))}
       </div>
@@ -78,7 +98,7 @@ export default function Contacts() {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${statusColors[c.status as string] || "bg-gray-100 text-gray-600"}`}>
-                    {(c.status as string)?.replace("_", " ")}
+                    {statusLabel((c.status as string) || "")}
                   </span>
                   <span className="text-[10px] text-gray-400 flex items-center gap-1"><Calendar size={9} />{new Date(c.created_at as string).toLocaleDateString()}</span>
                 </div>
@@ -90,12 +110,12 @@ export default function Contacts() {
                 <div className="flex flex-col sm:flex-row gap-2 mt-3 pt-3 border-t border-gray-100">
                   <select value={newStatus} onChange={(e) => setNewStatus(e.target.value)} className="px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white">
                     <option value="">Set status...</option>
-                    {statusOptions.map((s) => <option key={s} value={s}>{s.replace("_", " ")}</option>)}
+                    {statusOptions.map((s) => <option key={s} value={s}>{statusLabel(s)}</option>)}
                   </select>
                   <input type="text" placeholder="Add a note (optional)" value={note} onChange={(e) => setNote(e.target.value)}
                     className="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-sm" />
                   <button onClick={() => updateStatus(c.id as string)} className="px-4 py-2 rounded-lg text-xs font-bold text-white bg-brand-blue hover:bg-brand-royal transition-colors">Update</button>
-                  <button onClick={() => setSelectedId(null)} className="px-3 py-2 rounded-lg text-xs text-gray-500 hover:bg-gray-100">Cancel</button>
+                  <button onClick={() => { setSelectedId(null); setNewStatus(""); setNote(""); }} className="px-3 py-2 rounded-lg text-xs text-gray-500 hover:bg-gray-100">Cancel</button>
                 </div>
               ) : (
                 <button onClick={() => { setSelectedId(c.id as string); setNewStatus(c.status as string); }}

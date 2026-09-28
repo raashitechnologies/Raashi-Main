@@ -1,4 +1,5 @@
 from typing import Optional
+import logging
 """
 Coordinator API endpoints — protected with require_role("coordinator", "admin").
 Admins can also access coordinator endpoints.
@@ -22,6 +23,7 @@ from app.schemas import ApplicationStatusUpdate, ScreeningRemarkCreate, ContactS
 
 router = APIRouter(prefix="/coordinator", tags=["coordinator"])
 limiter = Limiter(key_func=get_remote_address)
+logger = logging.getLogger(__name__)
 
 # Both coordinator and admin can access these endpoints
 coord_dep = require_role("coordinator", "admin")
@@ -427,7 +429,32 @@ async def update_contact_status(
     if body.note:
         await repo.add_follow_up(contact_id, body.note, current_user["id"])
     await audit.log(current_user["id"], current_user["email"], f"status_{body.status}", "contacts", contact_id)
-    return {"status": "updated"}
+
+    # Read the canonical persisted contact before notifying its owner. Email
+    # delivery is intentionally best-effort: it cannot roll back D1 or audit.
+    contact = await repo.get_by_id(contact_id)
+    if not contact:
+        logger.error("Updated contact could not be read back: id=%s", contact_id)
+        return {"status": "updated", "new_status": body.status, "contact": None, "notification": "failed"}
+
+    notification = "failed"
+    email = contact.get("email")
+    if email:
+        try:
+            from app.services.email_service import send_contact_status_update_email
+            sent = await send_contact_status_update_email(
+                to_email=email,
+                contact_name=contact.get("full_name") or "",
+                subject=contact.get("subject") or "",
+                new_status=contact.get("status") or body.status,
+            )
+            notification = "sent" if sent else "failed"
+        except Exception:
+            logger.exception("Contact status notification failed after persistence: id=%s", contact_id)
+    else:
+        logger.warning("Contact status notification skipped; missing email: id=%s", contact_id)
+
+    return {"status": "updated", "new_status": contact["status"], "contact": contact, "notification": notification}
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
