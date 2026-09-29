@@ -9,9 +9,9 @@
  * - activeIndex is NOT reset on mouse-leave of the row — the last-hovered
  *   tile stays expanded, matching the "hover to preview, first tile open
  *   by default" pattern (like a hover-controlled tab/accordion).
- * - On desktop (md+): flex-row with equal flex-1 widths — tiles never change
+ * - On desktop (xl+): flex-row with equal flex-1 widths — tiles never change
  *   width when expanding/collapsing. Only internal content animates.
- * - On mobile (<md): flex-col; tiles stack. Each tile remains individually
+ * - On mobile and tablet (<xl): flex-col; tiles stack. Each tile remains individually
  *   tap-to-expand via the onClick handler on HoverExpandDomainTile. Because
  *   hover doesn't exist on touch, onClick provides the expand trigger, so
  *   the feature is never dead weight on mobile.
@@ -44,11 +44,11 @@ export function HoverExpandDomainRow({
 
   if (isLoading) {
     return (
-      <div className="flex flex-col md:flex-row gap-4 items-stretch">
+      <div className="flex flex-col xl:flex-row gap-4 items-stretch">
         {Array.from({ length: 5 }).map((_, i) => (
           <div
             key={i}
-            className="flex-1 min-w-0 min-h-[140px] md:min-h-[380px] rounded-2xl animate-pulse border border-[#E98A3A]/15"
+            className="flex-1 min-w-0 min-h-[140px] xl:min-h-[380px] rounded-2xl animate-pulse border border-[#E98A3A]/15"
             style={{ background: "#F1F1EE" }}
             aria-hidden="true"
           />
@@ -79,7 +79,7 @@ export function HoverExpandDomainRow({
 
   return (
     <div
-      className="flex flex-col md:flex-row gap-4 items-stretch"
+      className="flex flex-col xl:flex-row gap-4 items-stretch"
       role="region"
       aria-label="Domain tiles — hover or tap to explore"
     >

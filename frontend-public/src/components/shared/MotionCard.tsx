@@ -77,11 +77,11 @@ export function MotionCard({
   const ref = useRef<HTMLDivElement>(null);
   const prefersReduced = useReducedMotion();
 
-  // Detect mobile via matchMedia so it stays accurate if the window resizes.
-  // This is evaluated at render time — stable for the lifetime of the component.
-  const isMobile =
+  // Compact layouts don't have room for depth cues; avoid the extra 3D work
+  // there while keeping the desktop card treatment unchanged.
+  const isCompact =
     typeof window !== "undefined" &&
-    window.matchMedia("(max-width: 767px)").matches;
+    window.matchMedia("(max-width: 1279px)").matches;
 
   // Viewport entry — fires once, no replay on scroll-back
   const isInView = useInView(ref, {
@@ -101,11 +101,11 @@ export function MotionCard({
   } else if (variant === "panel") {
     initial = panel3DInitial;
     animate = panel3DAnimate;
-    animateTransition = panel3DTransition(staggerDelay(index, total, isMobile));
+    animateTransition = panel3DTransition(staggerDelay(index, total, isCompact));
   } else {
-    initial = card3DInitial(index, isMobile);
+    initial = card3DInitial(index, isCompact);
     animate = card3DAnimate;
-    animateTransition = card3DTransition(staggerDelay(index, total, isMobile));
+    animateTransition = card3DTransition(staggerDelay(index, total, isCompact));
   }
 
   // ── Perspective container ───────────────────────────────────────────────
@@ -117,7 +117,7 @@ export function MotionCard({
     <div
       ref={ref}
       style={{
-        perspective: prefersReduced || variant === "panel" ? "none" : "1200px",
+        perspective: prefersReduced || isCompact || variant === "panel" ? "none" : "1200px",
         ...style,
       }}
       className={className}

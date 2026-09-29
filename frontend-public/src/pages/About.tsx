@@ -185,7 +185,14 @@ export default function About() {
 
             <FadeInView direction="left">
               <div className="relative rounded-3xl overflow-hidden bg-brand-navy aspect-video flex items-center justify-center shadow-floating">
-                <img src="/image2.png" alt="Team" className="absolute inset-0 w-full h-full object-cover" />
+                <img
+                  src="/image2.png"
+                  alt="Team"
+                  className="absolute inset-0 w-full h-full object-cover"
+                  loading="lazy"
+                  width="800"
+                  height="600"
+                />
                 <div className="absolute bottom-4 right-4 bg-brand-navy/60 backdrop-blur border border-white/20 rounded-xl px-4 py-2 z-10">
                   <p className="text-white text-xs font-semibold">Belgaum, Karnataka 🇮🇳</p>
                 </div>

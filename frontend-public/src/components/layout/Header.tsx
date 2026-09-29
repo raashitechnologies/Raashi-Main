@@ -2,8 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 
-// @ts-ignore
-const MotionNavLink = motion(NavLink as any);
+const MotionNavLink = motion.create(NavLink as any);
 import {
   ChevronDown, Menu, X, Brain, Cpu,
   FlaskConical, Wifi, Wrench, GraduationCap, ArrowRight,
@@ -217,9 +216,15 @@ export function Header({
     setDrawerOpen(false);
   }, [location]);
 
-  // Body scroll lock when drawer is open
+  // Body scroll lock when drawer is open. Restore pre-existing inline styles
+  // exactly so the drawer cannot disturb another overlay or page-level lock.
   useEffect(() => {
-    document.body.style.overflow = drawerOpen ? "hidden" : "";
+    if (!drawerOpen) return;
+
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousRootOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
     
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -227,12 +232,11 @@ export function Header({
       }
     };
     
-    if (drawerOpen) {
-      window.addEventListener("keydown", handleEscape);
-    }
+    window.addEventListener("keydown", handleEscape);
     
     return () => { 
-      document.body.style.overflow = ""; 
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousRootOverflow;
       window.removeEventListener("keydown", handleEscape);
     };
   }, [drawerOpen]);
@@ -471,7 +475,7 @@ export function Header({
               onClick={() => setDrawerOpen(!drawerOpen)}
               aria-label={drawerOpen ? "Close menu" : "Open menu"}
               aria-expanded={drawerOpen}
-              className="xl:hidden p-2 rounded-full transition-colors text-white hover:bg-white/10"
+              className="xl:hidden min-w-11 min-h-11 flex items-center justify-center rounded-full transition-colors text-white hover:bg-white/10"
             >
               {drawerOpen ? <X size={22} /> : <Menu size={22} />}
             </button>
@@ -508,7 +512,7 @@ export function Header({
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
               transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-              className="fixed left-0 top-0 bottom-0 w-72 bg-white z-[70] xl:hidden flex flex-col shadow-floating"
+              className="fixed left-0 top-0 bottom-0 w-72 max-w-[calc(100%-1rem)] bg-white z-[70] xl:hidden flex flex-col shadow-floating"
               aria-label="Mobile navigation"
             >
               {/* Drawer header */}
@@ -517,7 +521,7 @@ export function Header({
                 <button
                   onClick={() => setDrawerOpen(false)}
                   aria-label="Close menu"
-                  className="p-1.5 rounded-lg hover:bg-[#F5F0E6] text-brand-navy/60"
+                  className="min-w-11 min-h-11 flex items-center justify-center rounded-lg hover:bg-[#F5F0E6] text-brand-navy/60"
                 >
                   <X size={20} />
                 </button>

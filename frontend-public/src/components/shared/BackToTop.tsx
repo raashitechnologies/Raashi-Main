@@ -86,7 +86,9 @@ export function BackToTop() {
       // Safe-area-aware bottom positioning via inline style (Tailwind can't
       // interpolate env() values directly in class strings)
       style={{
-        bottom: "max(1.25rem, calc(env(safe-area-inset-bottom, 0px) + 1rem))",
+        // Keep a stable 12px gap above the WhatsApp control on every viewport.
+        // The safe-area term keeps both controls reachable on iOS devices.
+        bottom: "max(5.75rem, calc(env(safe-area-inset-bottom, 0px) + 5.5rem))",
       }}
     >
       <ChevronUp size={20} strokeWidth={2.5} aria-hidden="true" />

@@ -99,6 +99,7 @@ function AppRoutes() {
     outgoingLayerRef,
     wipeBandRef,
     isTransitioning,
+    isCompact,
     notifyReady,
     navigate,
   } = usePageTransition(browserLocation as any);
@@ -125,6 +126,7 @@ function AppRoutes() {
         wipeBandRef={wipeBandRef}
         outgoingScrollY={outgoingScrollY}
         isTransitioning={isTransitioning}
+        isCompact={isCompact}
         outgoingContent={
           outgoingLocation ? (
             <LocationContext.Provider value={buildCtx(outgoingLocation)}>

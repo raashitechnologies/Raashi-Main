@@ -11,8 +11,8 @@
  *   "Learn more" button slides up into view at the bottom.
  * - Width NEVER changes — flex-1 wrapper in parent ensures equal widths.
  *
- * Touch fallback: onMouseEnter fires on pointer devices, onClick fires on
- * all devices including touch, so tap-to-expand works on mobile.
+ * Touch fallback: hover activation is restricted to fine hover pointers;
+ * coarse pointers use tap-to-expand instead.
  *
  * Reduced-motion: useReducedMotion() collapses all transform animations to
  * an instant opacity cross-fade, consistent with MotionCard.tsx behavior.
@@ -43,15 +43,24 @@ export function HoverExpandDomainTile({
   onHoverStart,
 }: HoverExpandDomainTileProps) {
   const prefersReducedMotion = useReducedMotion();
-  const [isMobile, setIsMobile] = useState(
-    () => typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches
+  const [isCompact, setIsCompact] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(max-width: 1279px)").matches
+  );
+  const [canHover, setCanHover] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(hover: hover) and (pointer: fine)").matches
   );
 
   useEffect(() => {
-    const mql = window.matchMedia("(max-width: 767px)");
-    const onChange = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-    mql.addEventListener("change", onChange);
-    return () => mql.removeEventListener("change", onChange);
+    const compactMql = window.matchMedia("(max-width: 1279px)");
+    const hoverMql = window.matchMedia("(hover: hover) and (pointer: fine)");
+    const onCompactChange = (e: MediaQueryListEvent) => setIsCompact(e.matches);
+    const onHoverChange = (e: MediaQueryListEvent) => setCanHover(e.matches);
+    compactMql.addEventListener("change", onCompactChange);
+    hoverMql.addEventListener("change", onHoverChange);
+    return () => {
+      compactMql.removeEventListener("change", onCompactChange);
+      hoverMql.removeEventListener("change", onHoverChange);
+    };
   }, []);
 
   // Derive 2-item checklist from existing data — no new data model fields needed.
@@ -68,10 +77,10 @@ export function HoverExpandDomainTile({
 
   return (
     <motion.div
-      // Parent owns which tile is active — no local hover state.
-      // onClick also fires onHoverStart for touch devices (tap-to-expand fallback).
-      onMouseEnter={onHoverStart}
-      onClick={onHoverStart}
+      // Parent owns which tile is active — no local hover state. Coarse
+      // pointers activate on tap, so tablet and mobile never depend on hover.
+      onPointerEnter={canHover ? onHoverStart : undefined}
+      onClick={canHover ? undefined : onHoverStart}
       animate={isActive ? "expanded" : "collapsed"}
       style={{
         // Tile background and border mimic warm-tile tokens without touching the
@@ -82,8 +91,8 @@ export function HoverExpandDomainTile({
         overflow: "hidden",
         position: "relative",
         // Fixed height on desktop ensures zero layout reflow. On mobile, allow natural height.
-        minHeight: isMobile ? "auto" : "380px",
-        cursor: "pointer",
+        minHeight: isCompact ? "auto" : "380px",
+        cursor: canHover ? "pointer" : "default",
         display: "flex",
         flexDirection: "column",
         padding: "24px",
@@ -114,8 +123,8 @@ export function HoverExpandDomainTile({
           width: "80%",
           height: 120,
           borderRadius: "50%",
-          background: `radial-gradient(ellipse at 50% 0%, ${domain.accentColor}${isMobile ? '15' : '20'} 0%, transparent 70%)`,
-          filter: isMobile ? "none" : "blur(32px)",
+          background: `radial-gradient(ellipse at 50% 0%, ${domain.accentColor}${isCompact ? '15' : '20'} 0%, transparent 70%)`,
+          filter: isCompact ? "none" : "blur(32px)",
           pointerEvents: "none",
           zIndex: 0,
         }}
@@ -172,7 +181,7 @@ export function HoverExpandDomainTile({
       <motion.div
         style={{ position: "relative", zIndex: 1, flex: "1 1 auto" }}
         variants={{
-          collapsed: { y: prefersReducedMotion || isMobile ? 0 : 72, opacity: 0.85 },
+          collapsed: { y: prefersReducedMotion || isCompact ? 0 : 72, opacity: 0.85 },
           expanded: { y: 0, opacity: 1 },
         }}
         transition={makeTransition(EXPAND_DURATION)}
@@ -258,7 +267,7 @@ export function HoverExpandDomainTile({
           >
             <Link
               to={`/domains/${domain.slug}`}
-              className="bg-[#0560DF] hover:bg-[#0E2F9D] text-white transition-colors duration-200"
+              className="bg-[#0560DF] hover:bg-[#0E2F9D] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-2 text-white transition-[background-color,transform] duration-200"
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -269,15 +278,6 @@ export function HoverExpandDomainTile({
                 fontWeight: 600,
                 textDecoration: "none",
                 letterSpacing: "0.01em",
-              }}
-              onMouseDown={(e) => {
-                (e.currentTarget as HTMLAnchorElement).style.transform = "scale(0.97)";
-              }}
-              onMouseUp={(e) => {
-                (e.currentTarget as HTMLAnchorElement).style.transform = "scale(1)";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLAnchorElement).style.transform = "scale(1)";
               }}
               aria-label={`Learn more about ${domain.shortName}`}
             >

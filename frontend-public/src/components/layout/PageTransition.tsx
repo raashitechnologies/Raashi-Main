@@ -2,6 +2,7 @@ import {
   useRef,
   useState,
   useCallback,
+  useEffect,
   type ReactNode,
 } from "react";
 import { useReducedMotion } from "framer-motion";
@@ -73,6 +74,9 @@ type Loc = PageTransitionAPI["committedLocation"];
 
 export function usePageTransition(initialLocation: Loc) {
   const prefersReducedMotion = useReducedMotion();
+  const [isCompact, setIsCompact] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(max-width: 1279px)").matches
+  );
 
   // React state — only drives which route trees are MOUNTED
   const [committedLocation, setCommittedLocation] = useState<Loc>(initialLocation);
@@ -89,6 +93,18 @@ export function usePageTransition(initialLocation: Loc) {
   const pendingRef = useRef<Loc | null>(null);
   const raf1 = useRef(0);
   const raf2 = useRef(0);
+  const compactRef = useRef(isCompact);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 1279px)");
+    const onChange = (event: MediaQueryListEvent) => setIsCompact(event.matches);
+    mediaQuery.addEventListener("change", onChange);
+    return () => mediaQuery.removeEventListener("change", onChange);
+  }, []);
+
+  useEffect(() => {
+    compactRef.current = isCompact;
+  }, [isCompact]);
 
   // Keep these in refs so notifyReady never has stale closures
   const committedLocationRef = useRef<Loc>(initialLocation);
@@ -97,6 +113,7 @@ export function usePageTransition(initialLocation: Loc) {
   const navigate = useCallback((newLocation: Loc) => {
     if (prefersReducedMotion) {
       setCommittedLocation(newLocation);
+      window.scrollTo({ top: 0, behavior: "instant" });
       return;
     }
     if (wipingRef.current) {
@@ -130,7 +147,8 @@ export function usePageTransition(initialLocation: Loc) {
         const outEl = outgoingLayerRef.current;
         const bandEl = wipeBandRef.current;
 
-        if (!outEl || !bandEl) {
+        const lightweight = compactRef.current;
+        if (!outEl || (!lightweight && !bandEl)) {
           // DOM not ready (e.g. reduced motion unmounted them) — instant swap
           setOutgoingLocation(null);
           setIsTransitioning(false);
@@ -140,8 +158,8 @@ export function usePageTransition(initialLocation: Loc) {
         wipingRef.current = true;
 
         // Promote to GPU layers before animation starts
-        outEl.style.willChange = "clip-path";
-        bandEl.style.willChange = "clip-path";
+        outEl.style.willChange = lightweight ? "transform, opacity" : "clip-path";
+        if (bandEl) bandEl.style.willChange = "clip-path";
 
         const timing: KeyframeAnimationOptions = {
           duration: WIPE_DURATION_MS,
@@ -149,11 +167,16 @@ export function usePageTransition(initialLocation: Loc) {
           fill: "forwards",
         };
 
-        const animOut = outEl.animate(
-          [{ clipPath: clip(0) }, { clipPath: clip(1) }],
-          timing
-        );
-        const animBand = bandEl.animate(
+        const animOut = lightweight
+          ? outEl.animate(
+              [
+                { opacity: 1, transform: "translate3d(0, 0, 0)" },
+                { opacity: 0, transform: "translate3d(-8px, 0, 0)" },
+              ],
+              { ...timing, duration: 180 }
+            )
+          : outEl.animate([{ clipPath: clip(0) }, { clipPath: clip(1) }], timing);
+        const animBand = bandEl?.animate(
           [{ clipPath: band(0) }, { clipPath: band(1) }],
           timing
         );
@@ -196,6 +219,7 @@ export function usePageTransition(initialLocation: Loc) {
     outgoingLayerRef,
     wipeBandRef,
     isTransitioning,
+    isCompact,
     notifyReady,
     navigate,
   };
@@ -208,6 +232,7 @@ interface TransitionOverlayProps {
   wipeBandRef: React.RefObject<HTMLDivElement | null>;
   outgoingScrollY: number;
   isTransitioning: boolean;
+  isCompact: boolean;
   outgoingContent: ReactNode;
 }
 
@@ -216,6 +241,7 @@ export function TransitionOverlay({
   wipeBandRef,
   outgoingScrollY,
   isTransitioning,
+  isCompact,
   outgoingContent,
 }: TransitionOverlayProps) {
   if (!isTransitioning) return null;
@@ -231,7 +257,7 @@ export function TransitionOverlay({
             inset: 0,
             zIndex: 30,
             overflow: "hidden",
-            clipPath: clip(0), // WAAPI overrides this; seed avoids a flash
+            clipPath: isCompact ? undefined : clip(0), // WAAPI overrides this; seed avoids a flash
             pointerEvents: "none",
           }}
         >
@@ -248,18 +274,21 @@ export function TransitionOverlay({
         </div>
       )}
 
-      {/* [C] Wipe band — diagonal separator, clipped by WAAPI */}
-      <div
-        ref={wipeBandRef}
-        style={{
-          position: "fixed",
-          inset: 0,
-          zIndex: 40,
-          backgroundColor: BAND_COLOR,
-          clipPath: band(0), // WAAPI overrides this; seed avoids a flash
-          pointerEvents: "none",
-        }}
-      />
+      {/* [C] Desktop-only diagonal separator. Compact layouts use the lighter
+          opacity/transform transition above to avoid clip-path compositing. */}
+      {!isCompact && (
+        <div
+          ref={wipeBandRef}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 40,
+            backgroundColor: BAND_COLOR,
+            clipPath: band(0), // WAAPI overrides this; seed avoids a flash
+            pointerEvents: "none",
+          }}
+        />
+      )}
 
       {/* [D] Click blocker — prevents interaction during wipe */}
       <div
