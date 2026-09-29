@@ -20,6 +20,7 @@ from app.repositories import (
     AuditLogRepository, InternshipListingRepository,
 )
 from app.schemas import ApplicationStatusUpdate, ScreeningRemarkCreate, ContactStatusUpdate
+from app.core.audit_presentation import application_label, contact_label, status_label
 
 router = APIRouter(prefix="/coordinator", tags=["coordinator"])
 limiter = Limiter(key_func=get_remote_address)
@@ -179,13 +180,18 @@ async def update_internship_status(
     if body.status not in allowed_statuses:
         raise HTTPException(400, f"Invalid status. Allowed: {', '.join(sorted(allowed_statuses))}")
     try:
+        app = await repo.get_by_id(app_id)
+        if not app:
+            raise HTTPException(404, "Application not found")
+        previous_status = app.get("status")
         success = await repo.update_status(app_id, body.status, reviewed_by=current_user["email"])
     except ValueError:
         raise HTTPException(400, "Invalid application ID format")
     if not success:
         raise HTTPException(404, "Application not found")
         
-    await audit.log(current_user["id"], current_user["email"], f"status_{body.status}", "internship_applications", app_id)
+    label = application_label(app, "internship")
+    await audit.log(current_user["id"], current_user["email"], f"status_{body.status}", "internship_applications", app_id, resource_label=label, summary=f'Changed internship application "{label}" from {status_label(previous_status)} to {status_label(body.status)}')
     
     # Send status update email to candidate
     app = await repo.get_by_id(app_id)
@@ -236,12 +242,16 @@ async def add_internship_remark(
     audit: AuditLogRepository = Depends(get_audit_repo),
 ):
     try:
+        app = await repo.get_by_id(app_id)
+        if not app:
+            raise HTTPException(404, "Application not found")
         success = await repo.add_screening_remark(app_id, body.remark, current_user["id"], current_user["name"])
     except ValueError:
         raise HTTPException(400, "Invalid application ID format")
     if not success:
         raise HTTPException(404, "Application not found")
-    await audit.log(current_user["id"], current_user["email"], "add_remark", "internship_applications", app_id)
+    label = application_label(app, "internship")
+    await audit.log(current_user["id"], current_user["email"], "add_remark", "internship_applications", app_id, resource_label=label, summary=f'Added screening remark to internship application "{label}"')
     return {"status": "remark_added"}
 
 
@@ -318,13 +328,18 @@ async def update_career_status(
     if body.status not in allowed_statuses:
         raise HTTPException(400, f"Invalid status. Allowed: {', '.join(sorted(allowed_statuses))}")
     try:
+        app = await repo.get_by_id(app_id)
+        if not app:
+            raise HTTPException(404, "Application not found")
+        previous_status = app.get("status")
         success = await repo.update_status(app_id, body.status, reviewed_by=current_user["email"])
     except ValueError:
         raise HTTPException(400, "Invalid application ID format")
     if not success:
         raise HTTPException(404, "Application not found")
         
-    await audit.log(current_user["id"], current_user["email"], f"status_{body.status}", "career_applications", app_id)
+    label = application_label(app, "career")
+    await audit.log(current_user["id"], current_user["email"], f"status_{body.status}", "career_applications", app_id, resource_label=label, summary=f'Changed career application "{label}" from {status_label(previous_status)} to {status_label(body.status)}')
     
     # Send status update email to candidate
     app = await repo.get_by_id(app_id)
@@ -352,12 +367,16 @@ async def add_career_remark(
     audit: AuditLogRepository = Depends(get_audit_repo),
 ):
     try:
+        app = await repo.get_by_id(app_id)
+        if not app:
+            raise HTTPException(404, "Application not found")
         success = await repo.add_screening_remark(app_id, body.remark, current_user["id"], current_user["name"])
     except ValueError:
         raise HTTPException(400, "Invalid application ID format")
     if not success:
         raise HTTPException(404, "Application not found")
-    await audit.log(current_user["id"], current_user["email"], "add_remark", "career_applications", app_id)
+    label = application_label(app, "career")
+    await audit.log(current_user["id"], current_user["email"], "add_remark", "career_applications", app_id, resource_label=label, summary=f'Added screening remark to career application "{label}"')
     return {"status": "remark_added"}
 
 
@@ -421,6 +440,10 @@ async def update_contact_status(
     audit: AuditLogRepository = Depends(get_audit_repo),
 ):
     try:
+        contact_before = await repo.get_by_id(contact_id)
+        if not contact_before:
+            raise HTTPException(404, "Contact not found")
+        previous_status = contact_before.get("status")
         success = await repo.update_status(contact_id, body.status, handled_by=current_user["email"])
     except ValueError:
         raise HTTPException(400, "Invalid contact ID format")
@@ -428,7 +451,8 @@ async def update_contact_status(
         raise HTTPException(404, "Contact not found")
     if body.note:
         await repo.add_follow_up(contact_id, body.note, current_user["id"])
-    await audit.log(current_user["id"], current_user["email"], f"status_{body.status}", "contacts", contact_id)
+    label = contact_label(contact_before)
+    await audit.log(current_user["id"], current_user["email"], f"status_{body.status}", "contacts", contact_id, resource_label=label, summary=f'Changed contact enquiry "{label}" from {status_label(previous_status)} to {status_label(body.status)}')
 
     # Read the canonical persisted contact before notifying its owner. Email
     # delivery is intentionally best-effort: it cannot roll back D1 or audit.

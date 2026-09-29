@@ -22,6 +22,7 @@ from app.repositories import (
     WebsiteContentRepository, AuditLogRepository, InternshipListingRepository,
 )
 from app.services.indexnow import trigger_indexnow_background
+from app.core.audit_presentation import application_label, contact_label, content_label, status_label
 from app.schemas import (
     DomainCreate, DomainUpdate, ContactStatusUpdate,
     ApplicationStatusUpdate, ScreeningRemarkCreate,
@@ -136,7 +137,8 @@ async def update_content(
         raise HTTPException(status_code=400, detail=str(e))
     data = body.model_dump()
     await repo.upsert(section_key, data, updated_by=current_user["email"])
-    await audit.log(current_user["id"], current_user["email"], "update", "website_content", section_key, f"Updated content: {section_key}")
+    label = content_label(section_key)
+    await audit.log(current_user["id"], current_user["email"], "update", "website_content", section_key, resource_label=label, summary=f'Updated website content "{label}"')
     return {"status": "updated", "section_key": section_key}
 
 
@@ -154,7 +156,8 @@ async def toggle_publish(
     if not success:
         raise HTTPException(404, f"Content section '{section_key}' not found")
     action = "published" if publish else "unpublished"
-    await audit.log(current_user["id"], current_user["email"], action, "website_content", section_key)
+    label = content_label(section_key)
+    await audit.log(current_user["id"], current_user["email"], action, "website_content", section_key, resource_label=label, summary=f'{"Published" if publish else "Unpublished"} website content "{label}"')
     return {"status": action, "section_key": section_key}
 
 
@@ -196,7 +199,7 @@ async def create_domain(
     audit: AuditLogRepository = Depends(get_audit_repo),
 ):
     domain_id = await repo.create(body.model_dump())
-    await audit.log(current_user["id"], current_user["email"], "create", "domains", domain_id, f"Created domain: {body.name}")
+    await audit.log(current_user["id"], current_user["email"], "create", "domains", domain_id, resource_label=body.name, summary=f'Created domain "{body.name}"')
     domain = await repo.get_by_id_admin(domain_id)
     # The ASGI adapter does not expose a request execution context to endpoint
     # code, so this best-effort call is deliberately isolated by the service.
@@ -254,7 +257,8 @@ async def update_domain(
         raise HTTPException(400, "Invalid domain ID format")
     if not success:
         raise HTTPException(404, "Domain not found")
-    await audit.log(current_user["id"], current_user["email"], "update", "domains", domain_id)
+    domain_label = existing.get("name") or existing.get("short_name") or existing.get("slug")
+    await audit.log(current_user["id"], current_user["email"], "update", "domains", domain_id, resource_label=domain_label, summary=f'Updated domain "{domain_label}"')
 
     # Fetch after the successful D1 mutation so the editor and public API share
     # one persisted source of truth. IndexNow can never change this outcome.
@@ -289,7 +293,8 @@ async def delete_domain(
         raise HTTPException(400, "Invalid domain ID format")
     if not success:
         raise HTTPException(404, "Domain not found")
-    await audit.log(current_user["id"], current_user["email"], "delete", "domains", domain_id)
+    domain_label = domain.get("name") or domain.get("short_name") or domain.get("slug")
+    await audit.log(current_user["id"], current_user["email"], "delete", "domains", domain_id, resource_label=domain_label, summary=f'Permanently deleted domain "{domain_label}"')
 
     if image_object_key:
         from app.services.r2_storage import delete_file
@@ -412,10 +417,14 @@ async def upload_domain_image(
         logger.warning("Could not delete replaced domain image R2 object: key=%s", existing_gridfs_id)
 
     action = "replace_image" if is_replacement else "upload_image"
+    domain_label = domain.get("name") or domain.get("short_name") or domain.get("slug")
+    verb = "Replaced" if is_replacement else "Uploaded"
     await audit.log(
         current_user["id"], current_user["email"],
         action, "domains", domain_id,
         f"{'Replaced' if is_replacement else 'Uploaded'} overview image: {file.filename} ({len(content)} bytes)",
+        resource_label=domain_label,
+        summary=f'{verb} {target} image for domain "{domain_label}"',
     )
 
     return {
@@ -465,6 +474,8 @@ async def delete_domain_image(
         current_user["id"], current_user["email"],
         "delete_image", "domains", domain_id,
         "Removed overview image",
+        resource_label=domain.get("name") or domain.get("short_name") or domain.get("slug"),
+        summary=f'Removed {target} image from domain "{domain.get("name") or domain.get("short_name") or domain.get("slug")}"',
     )
     return {"status": "deleted"}
 
@@ -493,7 +504,7 @@ async def create_internship_listing(
     audit: AuditLogRepository = Depends(get_audit_repo),
 ):
     listing_id = await repo.create(body.model_dump())
-    await audit.log(current_user["id"], current_user["email"], "create", "internships", listing_id, f"Created internship: {body.title}")
+    await audit.log(current_user["id"], current_user["email"], "create", "internships", listing_id, resource_label=body.title, summary=f'Created internship listing "{body.title}"')
     return {"id": listing_id, "status": "created"}
 
 
@@ -511,12 +522,16 @@ async def update_internship_listing(
     if not data:
         raise HTTPException(400, "No fields to update")
     try:
+        existing = await repo.get_by_id(listing_id)
+        if not existing:
+            raise HTTPException(404, "Internship listing not found")
         success = await repo.update(listing_id, data)
     except ValueError:
         raise HTTPException(400, "Invalid listing ID format")
     if not success:
         raise HTTPException(404, "Internship listing not found")
-    await audit.log(current_user["id"], current_user["email"], "update", "internships", listing_id)
+    label = data.get("title") or existing.get("title") or "Internship listing"
+    await audit.log(current_user["id"], current_user["email"], "update", "internships", listing_id, resource_label=label, summary=f'Updated internship listing "{label}"')
     return {"status": "updated"}
 
 
@@ -530,12 +545,16 @@ async def delete_internship_listing(
     audit: AuditLogRepository = Depends(get_audit_repo),
 ):
     try:
+        existing = await repo.get_by_id(listing_id)
+        if not existing:
+            raise HTTPException(404, "Internship listing not found")
         success = await repo.delete(listing_id)
     except ValueError:
         raise HTTPException(400, "Invalid listing ID format")
     if not success:
         raise HTTPException(404, "Internship listing not found")
-    await audit.log(current_user["id"], current_user["email"], "deactivate", "internships", listing_id)
+    label = existing.get("title") or "Internship listing"
+    await audit.log(current_user["id"], current_user["email"], "deactivate", "internships", listing_id, resource_label=label, summary=f'Deactivated internship listing "{label}"')
     return {"status": "deactivated"}
 
 
@@ -583,13 +602,18 @@ async def update_internship_app_status(
     audit: AuditLogRepository = Depends(get_audit_repo),
 ):
     try:
+        app = await repo.get_by_id(app_id)
+        if not app:
+            raise HTTPException(404, "Application not found")
+        previous_status = app.get("status")
         success = await repo.update_status(app_id, body.status, reviewed_by=current_user["email"])
     except ValueError:
         raise HTTPException(400, "Invalid application ID format")
     if not success:
         raise HTTPException(404, "Application not found")
         
-    await audit.log(current_user["id"], current_user["email"], f"status_{body.status}", "internship_applications", app_id)
+    label = application_label(app, "internship")
+    await audit.log(current_user["id"], current_user["email"], f"status_{body.status}", "internship_applications", app_id, resource_label=label, summary=f'Changed internship application "{label}" from {status_label(previous_status)} to {status_label(body.status)}')
     
     # Send status update email to candidate
     app = await repo.get_by_id(app_id)
@@ -617,12 +641,16 @@ async def add_internship_remark(
     audit: AuditLogRepository = Depends(get_audit_repo),
 ):
     try:
+        app = await repo.get_by_id(app_id)
+        if not app:
+            raise HTTPException(404, "Application not found")
         success = await repo.add_screening_remark(app_id, body.remark, current_user["id"], current_user["name"])
     except ValueError:
         raise HTTPException(400, "Invalid application ID format")
     if not success:
         raise HTTPException(404, "Application not found")
-    await audit.log(current_user["id"], current_user["email"], "add_remark", "internship_applications", app_id)
+    label = application_label(app, "internship")
+    await audit.log(current_user["id"], current_user["email"], "add_remark", "internship_applications", app_id, resource_label=label, summary=f'Added screening remark to internship application "{label}"')
     return {"status": "remark_added"}
 
 
@@ -673,7 +701,8 @@ async def delete_internship_app(
         from app.services.r2_storage import delete_file
         await delete_file(request.scope["env"], app.get("resume_object_key"))
 
-    await audit.log(current_user["id"], current_user["email"], "delete", "internship_applications", app_id)
+    label = application_label(app, "internship")
+    await audit.log(current_user["id"], current_user["email"], "delete", "internship_applications", app_id, resource_label=label, summary=f'Permanently deleted internship application "{label}"')
     return {"status": "deleted"}
 
 
@@ -715,10 +744,7 @@ async def create_job(
     audit: AuditLogRepository = Depends(get_audit_repo),
 ):
     job_id = await repo.create(body.model_dump())
-    await audit.log(
-        current_user["id"], current_user["email"],
-        "create", "careers", job_id, f"Created job: {body.title}"
-    )
+    await audit.log(current_user["id"], current_user["email"], "create", "careers", job_id, resource_label=body.title, summary=f'Created job "{body.title}"')
     # Return the canonical job so the frontend can sync without a second request
     job = await repo.get_by_id(job_id)
     if not job:
@@ -748,10 +774,8 @@ async def update_job(
     success = await repo.update(job_id, data)
     if not success:
         raise HTTPException(404, "Job opening not found")
-    await audit.log(
-        current_user["id"], current_user["email"],
-        "update", "careers", job_id, f"Updated job fields: {', '.join(data.keys())}"
-    )
+    job_label = data.get("title") or existing.get("title")
+    await audit.log(current_user["id"], current_user["email"], "update", "careers", job_id, resource_label=job_label, summary=f'Updated job "{job_label}"')
     # Return the canonical updated job
     job = await repo.get_by_id(job_id)
     if not job:
@@ -777,11 +801,9 @@ async def update_job_status(
     if not success:
         raise HTTPException(404, "Job opening not found")
     action = "reopen" if body.is_active else "close"
-    await audit.log(
-        current_user["id"], current_user["email"],
-        action, "careers", job_id,
-        f"{'Reopened' if body.is_active else 'Closed'} job: {existing.get('title', job_id)}"
-    )
+    job_label = existing.get("title") or "Job opening"
+    verb = "Reopened" if body.is_active else "Closed"
+    await audit.log(current_user["id"], current_user["email"], action, "careers", job_id, resource_label=job_label, summary=f'{verb} job "{job_label}"')
     job = await repo.get_by_id(job_id)
     return {"status": action + "d", "job": job}
 
@@ -802,11 +824,8 @@ async def delete_job(
     success = await repo.hard_delete(job_id)
     if not success:
         raise HTTPException(404, "Job opening not found")
-    await audit.log(
-        current_user["id"], current_user["email"],
-        "delete", "careers", job_id,
-        f"Permanently deleted job: {existing.get('title', job_id)}"
-    )
+    job_label = existing.get("title") or "Job opening"
+    await audit.log(current_user["id"], current_user["email"], "delete", "careers", job_id, resource_label=job_label, summary=f'Permanently deleted job "{job_label}"')
     return {"status": "deleted", "id": job_id}
 
 
@@ -853,13 +872,18 @@ async def update_career_app_status(
     audit: AuditLogRepository = Depends(get_audit_repo),
 ):
     try:
+        app = await repo.get_by_id(app_id)
+        if not app:
+            raise HTTPException(404, "Application not found")
+        previous_status = app.get("status")
         success = await repo.update_status(app_id, body.status, reviewed_by=current_user["email"])
     except ValueError:
         raise HTTPException(400, "Invalid application ID format")
     if not success:
         raise HTTPException(404, "Application not found")
         
-    await audit.log(current_user["id"], current_user["email"], f"status_{body.status}", "career_applications", app_id)
+    label = application_label(app, "career")
+    await audit.log(current_user["id"], current_user["email"], f"status_{body.status}", "career_applications", app_id, resource_label=label, summary=f'Changed career application "{label}" from {status_label(previous_status)} to {status_label(body.status)}')
     
     # Send status update email to candidate
     app = await repo.get_by_id(app_id)
@@ -887,12 +911,16 @@ async def add_career_remark(
     audit: AuditLogRepository = Depends(get_audit_repo),
 ):
     try:
+        app = await repo.get_by_id(app_id)
+        if not app:
+            raise HTTPException(404, "Application not found")
         success = await repo.add_screening_remark(app_id, body.remark, current_user["id"], current_user["name"])
     except ValueError:
         raise HTTPException(400, "Invalid application ID format")
     if not success:
         raise HTTPException(404, "Application not found")
-    await audit.log(current_user["id"], current_user["email"], "add_remark", "career_applications", app_id)
+    label = application_label(app, "career")
+    await audit.log(current_user["id"], current_user["email"], "add_remark", "career_applications", app_id, resource_label=label, summary=f'Added screening remark to career application "{label}"')
     return {"status": "remark_added"}
 
 
@@ -943,7 +971,8 @@ async def delete_career_app(
         from app.services.r2_storage import delete_file
         await delete_file(request.scope["env"], app.get("resume_object_key"))
         
-    await audit.log(current_user["id"], current_user["email"], "delete", "career_applications", app_id)
+    label = application_label(app, "career")
+    await audit.log(current_user["id"], current_user["email"], "delete", "career_applications", app_id, resource_label=label, summary=f'Permanently deleted career application "{label}"')
     return {"status": "deleted"}
 
 
@@ -992,6 +1021,10 @@ async def update_contact_status(
     audit: AuditLogRepository = Depends(get_audit_repo),
 ):
     try:
+        contact_before = await repo.get_by_id(contact_id)
+        if not contact_before:
+            raise HTTPException(404, "Contact not found")
+        previous_status = contact_before.get("status")
         success = await repo.update_status(contact_id, body.status, handled_by=current_user["email"])
     except ValueError:
         raise HTTPException(400, "Invalid contact ID format")
@@ -999,7 +1032,8 @@ async def update_contact_status(
         raise HTTPException(404, "Contact not found")
     if body.note:
         await repo.add_follow_up(contact_id, body.note, current_user["id"])
-    await audit.log(current_user["id"], current_user["email"], f"status_{body.status}", "contacts", contact_id)
+    label = contact_label(contact_before)
+    await audit.log(current_user["id"], current_user["email"], f"status_{body.status}", "contacts", contact_id, resource_label=label, summary=f'Changed contact enquiry "{label}" from {status_label(previous_status)} to {status_label(body.status)}')
 
     # D1 is the source of truth. A failed notification must not turn this
     # committed status update into a failed request.
@@ -1081,7 +1115,7 @@ async def create_user(
         "email_verified": email_verified,
     }
     user_id = await repo.create(user_data)
-    await audit.log(current_user["id"], current_user["email"], "create", "users", user_id, f"Created coordinator: {body.email}")
+    await audit.log(current_user["id"], current_user["email"], "create", "users", user_id, resource_label=body.email, summary=f'Created user "{body.email}"')
 
     # Send verification email if not skipped
     if not email_verified:
@@ -1149,7 +1183,8 @@ async def update_user(
         raise HTTPException(400, "No fields to update")
 
     await repo.update(user_id, data)
-    await audit.log(current_user["id"], current_user["email"], "update", "users", user_id)
+    label = data.get("email") or target_user.get("email") or target_user.get("name")
+    await audit.log(current_user["id"], current_user["email"], "update", "users", user_id, resource_label=label, summary=f'Updated user "{label}"')
     return {"status": "updated"}
 
 
@@ -1174,7 +1209,8 @@ async def toggle_user_active(
 
     await repo.set_active(user_id, active)
     action = "activated" if active else "deactivated"
-    await audit.log(current_user["id"], current_user["email"], action, "users", user_id)
+    label = target_user.get("email") or target_user.get("name") or "User"
+    await audit.log(current_user["id"], current_user["email"], action, "users", user_id, resource_label=label, summary=f'{"Activated" if active else "Deactivated"} user "{label}"')
     return {"status": action}
 
 
@@ -1347,6 +1383,8 @@ async def upload_brochure(
         current_user["id"], current_user["email"],
         "upload", "brochure", object_key,
         f"Uploaded brochure: {file.filename} ({len(content)} bytes)",
+        resource_label=file.filename or "brochure.pdf",
+        summary=f'Uploaded brochure "{file.filename or "brochure.pdf"}"',
     )
 
     return {

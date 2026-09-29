@@ -5,12 +5,23 @@ import { PageLoading } from "@shared/ui/LoadingStates";
 import { ErrorState, EmptyState } from "@shared/ui/FeedbackStates";
 import { normalizeApiError } from "@shared/lib/apiError";
 
-interface LogEntry { id: string; user_email: string; action: string; resource: string; resource_id?: string; details?: string; timestamp: string }
+interface LogEntry { id: string; user_email: string; action: string; action_label?: string; resource: string; resource_label?: string; resource_id?: string; summary?: string; details?: string; timestamp: string }
+
+const legacyActionLabels: Record<string, string> = { create: "Created", update: "Updated", delete: "Deleted", deactivate: "Deactivated", activated: "Activated", deactivated: "Deactivated", published: "Published", unpublished: "Unpublished", add_remark: "Added remark" };
+const legacyResourceLabels: Record<string, string> = { domains: "domain", contacts: "contact enquiry", careers: "job", internships: "internship listing", internship_applications: "internship application", career_applications: "career application", website_content: "website content", users: "user", policies: "policy", brochure: "brochure" };
+function presentation(log: LogEntry) {
+  if (log.summary) return log.summary;
+  if (log.details) return log.details;
+  const status = log.action.match(/^status_(.+)$/)?.[1];
+  const action = status ? `Changed status to ${status.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())}` : (log.action_label || legacyActionLabels[log.action] || "Updated");
+  const resource = log.resource_label || legacyResourceLabels[log.resource] || "resource no longer available";
+  return `${action} ${resource}`;
+}
 
 const actionColors: Record<string, string> = {
   create: "text-emerald-600", update: "text-blue-600", delete: "text-red-600",
   deactivate: "text-amber-600", activated: "text-green-600", deactivated: "text-gray-500",
-  published: "text-emerald-600", unpublished: "text-gray-500", add_remark: "text-purple-600",
+  published: "text-emerald-600", unpublished: "text-gray-500", add_remark: "text-purple-600", status_update: "text-blue-600",
 };
 
 export default function AuditLogs() {
@@ -56,11 +67,9 @@ export default function AuditLogs() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-gray-700">
                       <span className="font-medium text-gray-800">{log.user_email}</span>
-                      {" "}<span className={`font-semibold ${colorClass}`}>{log.action.replace(/_/g, " ")}</span>
-                      {" on "}<span className="font-medium">{log.resource.replace(/_/g, " ")}</span>
-                      {log.resource_id && <span className="text-gray-400"> ({log.resource_id.slice(0, 8)}…)</span>}
+                      {" "}<span className={`font-semibold ${colorClass}`}>{presentation(log)}</span>
                     </p>
-                    {log.details && <p className="text-xs text-gray-400 mt-0.5">{log.details}</p>}
+                    {!log.summary && log.details && <p className="text-xs text-gray-400 mt-0.5">{log.details}</p>}
                   </div>
                   <span className="text-[10px] text-gray-400 shrink-0 flex items-center gap-1">
                     <Calendar size={9} />{new Date(log.timestamp).toLocaleString()}

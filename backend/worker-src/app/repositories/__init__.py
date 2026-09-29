@@ -673,13 +673,23 @@ class AuditLogRepository:
         self.db = db
 
     async def log(self, user_id: str, user_email: str, action: str,
-                  resource: str, resource_id: str = "", details: str = "") -> str:
+                  resource: str, resource_id: str = "", details: str = "",
+                  resource_label: str = "", summary: str = "") -> str:
+        """Store machine fields plus immutable presentation snapshots.
+
+        Labels are supplied by mutation endpoints while the resource is still
+        available; GET therefore remains a single D1 query and deleted/renamed
+        resources do not make historical events unreadable.
+        """
+        from app.core.audit_presentation import canonical_audit
+        resource_label, summary, _ = canonical_audit(action, resource, resource_label, summary, details)
         new_id = generate_id()
         await self.db.prepare("""
-            INSERT INTO audit_logs (id, user_id, user_email, action, resource_type, resource_id, details, timestamp)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO audit_logs (id, user_id, user_email, action, resource_type, resource_id, resource_label, summary, details, timestamp)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """).bind(
-            new_id, user_id, user_email, action, resource, resource_id, details, now_iso()
+            new_id, user_id, user_email, action, resource, resource_id,
+            resource_label, summary or details, details, now_iso()
         ).run()
         return new_id
 
@@ -690,7 +700,17 @@ class AuditLogRepository:
             f"SELECT *, resource_type AS resource FROM audit_logs "
             f"ORDER BY timestamp DESC LIMIT {limit} OFFSET {skip}"
         ).all()
-        return res["results"]
+        from app.core.audit_presentation import canonical_audit
+        rows = res["results"]
+        for row in rows:
+            label, summary, action_label = canonical_audit(
+                row.get("action", ""), row.get("resource", row.get("resource_type", "")),
+                row.get("resource_label", ""), row.get("summary", ""), row.get("details", "")
+            )
+            row["resource_label"] = label
+            row["summary"] = summary
+            row["action_label"] = action_label
+        return rows
 
     async def count(self) -> int:
         row = await self.db.prepare("SELECT COUNT(*) as c FROM audit_logs").first()

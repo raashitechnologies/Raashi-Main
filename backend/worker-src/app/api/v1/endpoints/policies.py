@@ -28,6 +28,11 @@ def get_policy_repo(db: Any = Depends(get_database)) -> PolicyRepository:
 def get_audit_repo(db: Any = Depends(get_database)) -> AuditLogRepository:
     return AuditLogRepository(db)
 
+def _policy_label(policy: dict) -> str:
+    title = policy.get("title") or str(policy.get("document_type", "Policy")).replace("_", " ").title()
+    audience = str(policy.get("audience", "")).replace("_", " ").title()
+    return f"{title} — {audience}" if audience else title
+
 
 @router.get("/active", response_model=List[PolicyDocumentOut])
 @limiter.limit(get_settings().RATE_LIMIT_PUBLIC_READ)
@@ -122,7 +127,8 @@ async def create_policy_draft(
         action="CREATE_POLICY_DRAFT",
         resource="policies",
         resource_id=policy_id,
-        details=f"Created draft for {policy_in.document_type} - {policy_in.audience}"
+        resource_label=_policy_label(policy or policy_in.model_dump()),
+        summary=f'Created policy draft "{_policy_label(policy or policy_in.model_dump())}"'
     )
     
     return policy
@@ -167,7 +173,8 @@ async def update_policy_draft(
         action="UPDATE_POLICY_DRAFT",
         resource="policies",
         resource_id=policy_id,
-        details=f"Updated draft {policy_id}"
+        resource_label=_policy_label(updated_policy or policy),
+        summary=f'Updated policy "{_policy_label(updated_policy or policy)}"'
     )
     
     return updated_policy
@@ -207,7 +214,8 @@ async def publish_policy(
         action="PUBLISH_POLICY",
         resource="policies",
         resource_id=policy_id,
-        details=f"Published v{published_policy['version']} for {published_policy['document_type']} - {published_policy['audience']}"
+        resource_label=_policy_label(published_policy),
+        summary=f'Published policy "{_policy_label(published_policy)}"'
     )
     
     return published_policy

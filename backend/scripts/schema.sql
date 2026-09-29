@@ -188,6 +188,8 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     action TEXT NOT NULL,
     resource_type TEXT NOT NULL,
     resource_id TEXT,
+    resource_label TEXT,
+    summary TEXT,
     details TEXT,
     ip_address TEXT,
     timestamp TEXT NOT NULL
