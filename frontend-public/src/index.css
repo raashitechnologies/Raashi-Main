@@ -453,7 +453,7 @@
     .header-inner-grid {
       display: grid;
       /* Adjusted grid columns after considering typical content widths */
-      grid-template-columns: 290px minmax(0, 1fr) 210px 140px;
+      grid-template-columns: 290px minmax(0, 1fr) 210px;
       align-items: center;
       width: 100%;
     }

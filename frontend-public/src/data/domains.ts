@@ -314,8 +314,7 @@ export function normalizeDomain(d: any): Domain {
   const mapOfferSection = (s: any): DomainOfferSection => ({
     eyebrow: s?.eyebrow ?? "WHAT WE OFFER",
     heading: s?.heading ?? `Our ${shortName} Services`,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    cards: asArray<any>(s?.cards, whatWeOffer).map((c: any) => ({ title: c.title ?? "", description: c.description ?? "" })),
+    cards: whatWeOffer,
   });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -403,11 +402,20 @@ function decodeEntities(text?: string | null): string {
     rawOverview?.paragraphs ?? d.overview_paragraphs ?? d.overviewParagraphs,
     localFallback?.overviewParagraphs ?? [],
   );
-  const rawOfferCards = Array.isArray(rawOffer) ? rawOffer : rawOffer?.cards;
+  
+  const validOfferCards = [
+    rawOffer?.cards,
+    Array.isArray(rawOffer) ? rawOffer : undefined,
+    d.offers,
+    d.what_we_offer,
+    d.whatWeOffer
+  ].find((arr) => Array.isArray(arr) && arr.length > 0);
+
   const whatWeOffer: DomainOffer[] = asArray<any>(
-    rawOfferCards ?? d.what_we_offer ?? d.whatWeOffer,
+    validOfferCards,
     localFallback?.whatWeOffer ?? [],
   ).map((o: any) => ({ title: o.title ?? "", description: o.description ?? "" }));
+
   const technologies = asArray<string>(rawTech?.items ?? d.technologies, localFallback?.technologies ?? []);
   const applications = asArray<string>(rawApps?.items ?? d.applications, localFallback?.applications ?? []);
   const faqs: DomainFaq[] = asArray<any>(rawFaq?.items ?? d.faqs, localFallback?.faqs ?? []).map(

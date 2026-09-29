@@ -105,7 +105,7 @@ export default function AdminLayout() {
       <aside className="hidden lg:flex lg:flex-col lg:w-64 sidebar-gradient fixed inset-y-0 left-0 z-30">
         {/* Logo */}
         <div className="flex items-center gap-3 px-5 h-16 border-b border-white/[0.06]">
-          <Link to="/" className="flex items-center gap-2">
+          <Link to="/admin/dashboard" className="flex items-center gap-2">
             <img src="/logo.png" alt="Raashi" className="h-9 w-auto object-contain bg-white rounded-lg p-1" />
           </Link>
           <div>
@@ -138,10 +138,10 @@ export default function AdminLayout() {
               className="fixed inset-y-0 left-0 w-64 sidebar-gradient z-50 lg:hidden flex flex-col"
             >
               <div className="flex items-center justify-between px-5 h-16 border-b border-white/[0.06]">
-                <div className="flex items-center gap-2">
+                <Link to="/admin/dashboard" onClick={() => setSidebarOpen(false)} className="flex items-center gap-2">
                   <img src="/logo.png" alt="Raashi" className="h-8 w-auto bg-white rounded-lg p-1" />
                   <p className="text-xs font-bold text-white">Admin</p>
-                </div>
+                </Link>
                 <button onClick={() => setSidebarOpen(false)} className="text-white/40 hover:text-white transition-colors">
                   <X size={18} />
                 </button>

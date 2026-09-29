@@ -172,7 +172,7 @@ export function HoverExpandDomainTile({
       <motion.div
         style={{ position: "relative", zIndex: 1, flex: "1 1 auto" }}
         variants={{
-          collapsed: { y: prefersReducedMotion ? 0 : 72, opacity: 0.85 },
+          collapsed: { y: prefersReducedMotion || isMobile ? 0 : 72, opacity: 0.85 },
           expanded: { y: 0, opacity: 1 },
         }}
         transition={makeTransition(EXPAND_DURATION)}

@@ -110,7 +110,7 @@ export default function Home() {
         </script>
       </SEO>
       {/* ── 1. HERO ── */}
-      <section className="bg-brand-navy min-h-[80vh] sm:min-h-[88vh] relative overflow-hidden" aria-label="Hero">
+      <section className="bg-brand-navy lg:min-h-[88vh] relative overflow-hidden" aria-label="Hero">
         {/* Background glow */}
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute top-1/4 right-1/4 w-[600px] h-[600px] rounded-full opacity-[0.07]"
