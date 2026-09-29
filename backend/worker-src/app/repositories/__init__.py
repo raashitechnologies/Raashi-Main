@@ -684,13 +684,28 @@ class AuditLogRepository:
         from app.core.audit_presentation import canonical_audit
         resource_label, summary, _ = canonical_audit(action, resource, resource_label, summary, details)
         new_id = generate_id()
-        await self.db.prepare("""
-            INSERT INTO audit_logs (id, user_id, user_email, action, resource_type, resource_id, resource_label, summary, details, timestamp)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """).bind(
-            new_id, user_id, user_email, action, resource, resource_id,
-            resource_label, summary or details, details, now_iso()
-        ).run()
+        try:
+            await self.db.prepare("""
+                INSERT INTO audit_logs (id, user_id, user_email, action, resource_type, resource_id, resource_label, summary, details, timestamp)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """).bind(
+                new_id, user_id, user_email, action, resource, resource_id,
+                resource_label, summary or details, details, now_iso()
+            ).run()
+        except RuntimeError as exc:
+            # A rolling Worker deployment can receive traffic before D1 migration
+            # 0008 has been applied. Keep the business mutation successful and
+            # persist the canonical sentence in the legacy details column. This
+            # is deliberately narrow: all other D1 failures still surface.
+            if "no column named resource_label" not in str(exc):
+                raise
+            await self.db.prepare("""
+                INSERT INTO audit_logs (id, user_id, user_email, action, resource_type, resource_id, details, timestamp)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """).bind(
+                new_id, user_id, user_email, action, resource, resource_id,
+                summary or details, now_iso()
+            ).run()
         return new_id
 
     async def get_all(self, skip: int = 0, limit: int = 100) -> list[dict]:
