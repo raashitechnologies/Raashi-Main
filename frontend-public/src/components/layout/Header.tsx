@@ -316,11 +316,7 @@ export function Header({
     },
   };
 
-  // Logo height
-  const logoVariants = {
-    top: isDesktop ? { height: "42px", scale: 1 } : { height: "56px", scale: 1 },
-    scrolled: isDesktop ? { height: "32px", scale: 0.9 } : { height: "40px", scale: 0.95 },
-  };
+  // Logo variants removed — using text-only wordmark
 
   return (
     <>
@@ -359,28 +355,26 @@ export function Header({
             transition={springTransition}
             className={`w-full h-full mx-auto ${isDesktop ? 'header-inner-grid' : 'flex items-center justify-between'}`}
           >
-            {/* ── Logo ── */}
+            {/* ── Brand Wordmark ── */}
             <div className={isDesktop ? "brand-slot" : ""}>
               <Link
               to="/"
-              className="flex items-center gap-3 shrink-0"
+              className="flex items-center shrink-0"
               aria-label="Raashi — Home"
             >
-              <motion.img
-                src="/logo.png"
-                alt="Raashi"
-                initial={false}
-                variants={logoVariants}
-                animate={currentState}
-                transition={springTransition}
-                style={{ width: "auto", objectFit: "contain", transformOrigin: "left center" }}
-              />
               <motion.span
-                className="block font-semibold leading-tight"
+                className="block leading-tight"
                 initial={false}
-                animate={{ fontSize: isDesktop ? (scrolled ? "18px" : "22px") : "22px" }}
+                animate={{ fontSize: isDesktop ? (scrolled ? "26px" : "31px") : "28px" }}
                 transition={springTransition}
-                style={{ fontFamily: "'Montserrat', sans-serif", color: "#F97316", whiteSpace: "nowrap" }}
+                style={{
+                  fontFamily: "'Exo 2', sans-serif",
+                  fontWeight: 700,
+                  fontStyle: "italic",
+                  color: "#F94F0E",
+                  letterSpacing: "0.2px",
+                  whiteSpace: "nowrap",
+                }}
               >
                 Raashi
               </motion.span>
@@ -517,7 +511,16 @@ export function Header({
             >
               {/* Drawer header */}
               <div className="flex items-center justify-between px-5 h-16 border-b border-brand-navy/[0.08]">
-                <img src="/logo.png" alt="Raashi" className="h-8 w-auto object-contain" />
+                <span
+                  style={{
+                    fontFamily: "'Exo 2', sans-serif",
+                    fontWeight: 700,
+                    fontStyle: "italic",
+                    fontSize: "24px",
+                    color: "#F94F0E",
+                    letterSpacing: "0.2px",
+                  }}
+                >Raashi</span>
                 <button
                   onClick={() => setDrawerOpen(false)}
                   aria-label="Close menu"

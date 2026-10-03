@@ -16,7 +16,7 @@ const quickLinks = [
 const socials = [
   { icon: FaLinkedinIn, label: "LinkedIn", href: "https://www.linkedin.com/in/abhishek-gornale/" },
   { icon: FaWhatsapp, label: "WhatsApp", href: "https://wa.me/919742419316?text=Hello!%20I'm%20interested%20in%20learning%20more%20about%20Raashi%20Cognitive%20Technologies." },
-  { icon: Mail, label: "Gmail", href: "mailto:raashitechnologies@gmail.com" },
+  { icon: Mail, label: "Email", href: "mailto:info@raashitech.com" },
 ];
 
 interface FooterProps {
@@ -34,8 +34,8 @@ export function Footer({ contactEmail }: FooterProps) {
   const contactInfo = getContent("contact_info");
   const phone = contactInfo?.phone || "+91 9742419316";
   // Use contextual override when provided; otherwise fall back to CMS value
-  const email = contactEmail ?? (contactInfo?.email || "raashitechnologies@gmail.com");
-  const address = contactInfo?.address || "69, CTS NO.4482B/67, Shruti Layout, Kanabargi Road, Belgaum Fort, Belgaum – 590016, Karnataka";
+  const email = contactEmail ?? (contactInfo?.email || "info@raashitech.com");
+  const address = contactInfo?.address || "#69, CTS NO.4482B/67, Shruti Layout, Kanabargi Road, Belgaum – 590016, Karnataka";
   const hours = contactInfo?.hours || "Mon – Sat: 9:00 AM – 6:00 PM\nSunday: Closed";
 
   return (

@@ -31,15 +31,17 @@ export function validatePhone(phone: string, required: boolean): string {
   return "";
 }
 
-export function validateInstitutionName(name: string): string {
-  if (name && name.length > 200) return "College / University name must be 200 characters or fewer.";
-  if (name && !INSTITUTION_REGEX.test(name)) return "Please enter a valid college or university name.";
+export function validateInstitutionName(name: string, required: boolean = false): string {
+  if (!name.trim()) return required ? "Please enter your college / university." : "";
+  if (name.length > 200) return "College / University name must be 200 characters or fewer.";
+  if (!INSTITUTION_REGEX.test(name)) return "Please enter a valid college or university name.";
   return "";
 }
 
-export function validateCourseYear(course: string): string {
-  if (course && course.length > 100) return "Course and year must be 100 characters or fewer.";
-  if (course && !COURSE_REGEX.test(course)) return "Please enter a valid course and year.";
+export function validateCourseYear(course: string, required: boolean = false): string {
+  if (!course.trim()) return required ? "Please enter your course & year." : "";
+  if (course.length > 100) return "Course and year must be 100 characters or fewer.";
+  if (!COURSE_REGEX.test(course)) return "Please enter a valid course and year.";
   return "";
 }
 

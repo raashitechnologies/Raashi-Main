@@ -81,10 +81,10 @@ export default function Home() {
             "logo": "https://raashitech.com/logo.png",
             "description": "Transforming Knowledge into Intelligent Solutions",
             "telephone": "+919742419316",
-            "email": "raashitechnologies@gmail.com",
+            "email": "info@raashitech.com",
             "address": {
               "@type": "PostalAddress",
-              "streetAddress": "69, CTS NO.4482B/67, Shruti Layout, Kanabargi Road, Belgaum Fort",
+              "streetAddress": "#69, CTS NO.4482B/67, Shruti Layout, Kanabargi Road",
               "addressLocality": "Belagavi",
               "addressRegion": "Karnataka",
               "postalCode": "590016",
@@ -133,7 +133,7 @@ export default function Home() {
                 </span>
               </motion.div>
 
-              <h1 className="text-[clamp(1.75rem,6vw,4.5rem)] font-bold text-white leading-tight mb-6 break-words">
+              <h1 className="text-[clamp(2.25rem,7vw,5.5rem)] font-bold text-white leading-tight mb-6 break-words">
                 <FoldText 
                   text={hero?.heading || "Transforming Knowledge into"} 
                   splitBy="char"
@@ -165,9 +165,9 @@ export default function Home() {
               <motion.p
                 variants={FadeUp}
                 transition={{ ...transition.standard, delay: 0.1 }}
-                className="text-white/65 text-base sm:text-lg max-w-2xl mb-8 sm:mb-10 leading-relaxed font-light"
+                className="text-white/65 text-sm sm:text-base max-w-2xl mb-8 sm:mb-10 leading-relaxed font-light"
               >
-                {hero?.description || "Raashi Cognitive Technologies Pvt. Ltd. delivers innovative solutions in Artificial Intelligence, IoT, Smart Automation, 3D Design, Research & Development, and Skill Development to empower businesses and build a smarter future."}
+                {hero?.description || "We develop intelligent technology and engineering solutions that help businesses innovate, optimize, and grow."}
               </motion.p>
 
               <motion.div

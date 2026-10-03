@@ -77,8 +77,8 @@ export default function Apply() {
     !validateEmail(form.email) &&
     !validatePhone(form.phone, true) &&
     !validateSelect(form.domain_slug, "Please select a domain of interest.") &&
-    !validateInstitutionName(form.college) &&
-    !validateCourseYear(form.course_year) &&
+    !validateInstitutionName(form.college, true) &&
+    !validateCourseYear(form.course_year, true) &&
     !validateFreeText(form.message, 0, 1000, false) &&
     resume !== null;
 
@@ -110,8 +110,8 @@ export default function Apply() {
       email: validateEmail(form.email),
       phone: validatePhone(form.phone, true),
       domain_slug: validateSelect(form.domain_slug, "Please select a domain of interest."),
-      college: validateInstitutionName(form.college),
-      course_year: validateCourseYear(form.course_year),
+      college: validateInstitutionName(form.college, true),
+      course_year: validateCourseYear(form.course_year, true),
       message: validateFreeText(form.message, 0, 1000, false),
       resume: !resume ? "Please upload a resume." : (resume.size > 5 * 1024 * 1024 ? "Resume file is too large. Maximum allowed: 5MB." : "")
     };
@@ -295,10 +295,11 @@ export default function Apply() {
                   <AnimatedInput 
                     id="intern-college" 
                     label="College / University"
+                    required
                     value={form.college}
                     onChange={e => {
                       setForm({ ...form, college: e.target.value });
-                      setFieldErrors(prev => ({ ...prev, college: validateInstitutionName(e.target.value) }));
+                      setFieldErrors(prev => ({ ...prev, college: validateInstitutionName(e.target.value, true) }));
                     }}
                     placeholder="College / University name"
                     hasError={Boolean(fieldErrors.college)}
@@ -311,10 +312,11 @@ export default function Apply() {
                   <AnimatedInput 
                     id="intern-course" 
                     label="Course & Year"
+                    required
                     value={form.course_year}
                     onChange={e => {
                       setForm({ ...form, course_year: e.target.value });
-                      setFieldErrors(prev => ({ ...prev, course_year: validateCourseYear(e.target.value) }));
+                      setFieldErrors(prev => ({ ...prev, course_year: validateCourseYear(e.target.value, true) }));
                     }}
                     placeholder="e.g. B.E. CSE, 3rd Year"
                     hasError={Boolean(fieldErrors.course_year)}

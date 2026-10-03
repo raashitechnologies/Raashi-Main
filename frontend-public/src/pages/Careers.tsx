@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "react-router-dom";
-import { ArrowRight, Briefcase, MapPin, Clock, Lightbulb, TrendingUp, Users, BookOpen } from "lucide-react";
+import { ArrowRight, Briefcase, MapPin, Clock, Lightbulb, TrendingUp, Users, BookOpen, FileText, Edit3, X, ChevronLeft } from "lucide-react";
 import { Layout } from "@/components/layout/Layout";
 import { SEO } from "@/components/seo/SEO";
 import FoldText from "@/components/shared/FoldText";
@@ -41,6 +41,12 @@ interface JobOpening {
   type: string;
   description: string;
   posted_at: string;
+  // Extended JD fields (may not exist in all records)
+  reporting_to?: string;
+  role_purpose?: string;
+  key_responsibilities?: string[];
+  key_skills?: string[];
+  education_experience?: string;
 }
 
 const whyWorkCards = [
@@ -57,7 +63,9 @@ export default function Careers() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [applyOpen, setApplyOpen] = useState(false);
+  const [modalStep, setModalStep] = useState<'choice' | 'jd' | 'form'>('choice');
   const [selectedJob, setSelectedJob] = useState("");
+  const [selectedJobObj, setSelectedJobObj] = useState<JobOpening | null>(null);
   const [form, setForm] = useState({ full_name: "", email: "", phone: "", position: "", portfolio_url: "", message: "" });
   const [resume, setResume] = useState<File | null>(null);
   const [submitted, setSubmitted] = useState(false); // true after success — prevents re-submission
@@ -120,15 +128,17 @@ export default function Careers() {
     fetchJobs();
   }, [location.key, fetchJobs]);
 
-  const openApply = (jobTitle = "General Application") => {
+  const openApply = (jobTitle = "General Application", jobObj: JobOpening | null = null) => {
     const title = jobTitle || "General Application";
     setSelectedJob(title);
+    setSelectedJobObj(jobObj);
     setForm(f => ({ ...f, position: title }));
     setFieldErrors(prev => ({ ...prev, position: "" }));
     // Reset consent each time a new application is opened
     setTermsConsent(EMPTY_CONSENT);
     setRulesConsent(EMPTY_CONSENT);
     setOpenModal(null);
+    setModalStep('choice');
     setApplyOpen(true);
   };
 
@@ -381,7 +391,7 @@ export default function Careers() {
                         </div>
                       </div>
                       <Button
-                        onClick={() => openApply(job.title)}
+                        onClick={() => openApply(job.title, job)}
                         variant="primary"
                         size="md"
                         className="shrink-0 shadow-sm w-full sm:w-auto"
@@ -419,42 +429,153 @@ export default function Careers() {
         </div>
       </section>
 
-      {/* Apply Modal */}
+      {/* Apply Modal — Two-step: choice → JD or form */}
       {applyOpen && (
         <div className="fixed inset-0 bg-brand-navy/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 sm:p-6">
-          {/*
-            Modal card:
-              - flex flex-col   → header and content participate in the same flex column
-              - max-h avoids viewport overflow (dvh for mobile browser chrome accuracy)
-              - NO overflow-y-auto here — scrolling lives only on the content child
-          */}
           <div className="bg-white/55 backdrop-blur-xl backdrop-saturate-[160%] border border-white/60 rounded-3xl shadow-glass w-full max-w-lg flex flex-col max-h-[calc(100dvh-2rem)]">
 
-            {/* ── Modal Header — shrink-0 keeps it at a fixed height, never scrolled away ── */}
+            {/* ── Modal Header ── */}
             <div className="shrink-0 border-b border-white/60 px-6 py-4 flex items-start justify-between rounded-t-3xl bg-white/40">
-              <div>
-                <p className="text-xs font-semibold text-brand-navy/50 uppercase tracking-wide mb-0.5">Apply for</p>
-                <h2 className="text-lg font-bold text-brand-navy leading-snug">{selectedJob || "General Application"}</h2>
+              <div className="flex items-center gap-2 min-w-0">
+                {modalStep !== 'choice' && (
+                  <button
+                    onClick={() => setModalStep('choice')}
+                    aria-label="Back to options"
+                    className="shrink-0 text-brand-navy/50 hover:text-brand-navy transition-colors mr-1"
+                  >
+                    <ChevronLeft size={20} />
+                  </button>
+                )}
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-brand-navy/50 uppercase tracking-wide mb-0.5">
+                    {modalStep === 'choice' ? 'Apply for' : modalStep === 'jd' ? 'Job Description' : 'Apply for'}
+                  </p>
+                  <h2 className="text-lg font-bold text-brand-navy leading-snug truncate">{selectedJob || "General Application"}</h2>
+                </div>
               </div>
               <button
                 onClick={closeApply}
                 aria-label="Close application form"
-                className="ml-4 mt-0.5 shrink-0 text-brand-navy/50 hover:text-brand-navy transition-colors text-lg leading-none"
+                className="ml-4 mt-0.5 shrink-0 text-brand-navy/50 hover:text-brand-navy transition-colors"
               >
-                ✕
+                <X size={20} />
               </button>
             </div>
 
-            {/*
-              ── Scrollable Form Content ──
-                min-h-0       → critical in flex children; without it, flex child
-                                won't shrink below its content height and overflow-y-auto
-                                has no effect
-                flex-1        → takes all remaining height after the header
-                overflow-y-auto → THIS is the single scroll owner for the form
-                overscroll-contain → prevents scroll chaining into the background page
-            */}
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-6">
+            {/* ── Step: Choice ── */}
+            {modalStep === 'choice' && (
+              <div className="p-6 space-y-4">
+                <p className="text-sm text-brand-navy/60 text-center mb-2">What would you like to do?</p>
+                <button
+                  onClick={() => setModalStep('jd')}
+                  className="w-full flex items-center gap-4 p-5 rounded-2xl border border-brand-navy/10 bg-white/60 hover:bg-white/80 hover:border-brand-blue/30 transition-all group text-left"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-brand-blue/10 flex items-center justify-center shrink-0 group-hover:bg-brand-blue/15 transition-colors">
+                    <FileText size={22} className="text-brand-blue" strokeWidth={1.8} />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-brand-navy text-sm">Job Description</p>
+                    <p className="text-xs text-brand-navy/50 mt-0.5">View role details, responsibilities & requirements</p>
+                  </div>
+                  <ArrowRight size={16} className="ml-auto text-brand-navy/30 group-hover:text-brand-blue transition-colors shrink-0" />
+                </button>
+                <button
+                  onClick={() => setModalStep('form')}
+                  className="w-full flex items-center gap-4 p-5 rounded-2xl border border-brand-navy/10 bg-white/60 hover:bg-white/80 hover:border-brand-orange/30 transition-all group text-left"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-brand-orange/10 flex items-center justify-center shrink-0 group-hover:bg-brand-orange/15 transition-colors">
+                    <Edit3 size={22} className="text-brand-orange" strokeWidth={1.8} />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-brand-navy text-sm">Fill Details</p>
+                    <p className="text-xs text-brand-navy/50 mt-0.5">Submit your application with resume & cover note</p>
+                  </div>
+                  <ArrowRight size={16} className="ml-auto text-brand-navy/30 group-hover:text-brand-orange transition-colors shrink-0" />
+                </button>
+              </div>
+            )}
+
+            {/* ── Step: Job Description ── */}
+            {modalStep === 'jd' && (
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-6 space-y-5">
+                {/* Description */}
+                {selectedJobObj?.description && (
+                  <div>
+                    <h3 className="text-xs font-semibold text-brand-navy/50 uppercase tracking-wide mb-2">Overview</h3>
+                    <p className="text-sm text-brand-navy/70 leading-relaxed whitespace-pre-line">{selectedJobObj.description}</p>
+                  </div>
+                )}
+                {/* Role Purpose */}
+                {selectedJobObj?.role_purpose && (
+                  <div>
+                    <h3 className="text-xs font-semibold text-brand-navy/50 uppercase tracking-wide mb-2">Role Purpose</h3>
+                    <p className="text-sm text-brand-navy/70 leading-relaxed whitespace-pre-line">{selectedJobObj.role_purpose}</p>
+                  </div>
+                )}
+                {/* Reporting To */}
+                {selectedJobObj?.reporting_to && (
+                  <div>
+                    <h3 className="text-xs font-semibold text-brand-navy/50 uppercase tracking-wide mb-2">Reporting To</h3>
+                    <p className="text-sm text-brand-navy/70">{selectedJobObj.reporting_to}</p>
+                  </div>
+                )}
+                {/* Key Responsibilities */}
+                {selectedJobObj?.key_responsibilities && selectedJobObj.key_responsibilities.length > 0 && (
+                  <div>
+                    <h3 className="text-xs font-semibold text-brand-navy/50 uppercase tracking-wide mb-2">Key Responsibilities</h3>
+                    <ul className="space-y-1.5">
+                      {selectedJobObj.key_responsibilities.map((item, idx) => (
+                        <li key={idx} className="flex items-start gap-2 text-sm text-brand-navy/70">
+                          <span className="w-1.5 h-1.5 rounded-full bg-brand-blue/40 shrink-0 mt-1.5" />
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {/* Key Skills */}
+                {selectedJobObj?.key_skills && selectedJobObj.key_skills.length > 0 && (
+                  <div>
+                    <h3 className="text-xs font-semibold text-brand-navy/50 uppercase tracking-wide mb-2">Key Skills</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedJobObj.key_skills.map((skill, idx) => (
+                        <span key={idx} className="px-3 py-1 rounded-full bg-brand-blue/8 text-brand-navy/70 text-xs font-medium">{skill}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* Education & Experience */}
+                {selectedJobObj?.education_experience && (
+                  <div>
+                    <h3 className="text-xs font-semibold text-brand-navy/50 uppercase tracking-wide mb-2">Education & Experience</h3>
+                    <p className="text-sm text-brand-navy/70 leading-relaxed whitespace-pre-line">{selectedJobObj.education_experience}</p>
+                  </div>
+                )}
+                {/* No JD fields populated */}
+                {!selectedJobObj?.description && !selectedJobObj?.role_purpose && !selectedJobObj?.key_responsibilities?.length && (
+                  <div className="text-center py-8">
+                    <FileText size={32} className="text-brand-navy/20 mx-auto mb-3" />
+                    <p className="text-sm text-brand-navy/50">Detailed job description is not available yet.</p>
+                    <p className="text-xs text-brand-navy/40 mt-1">Please proceed to fill in your details to apply.</p>
+                  </div>
+                )}
+                {/* CTA to apply */}
+                <div className="pt-2">
+                  <Button
+                    onClick={() => setModalStep('form')}
+                    variant="primary"
+                    size="md"
+                    className="w-full shadow-sm"
+                  >
+                    <span className="flex items-center gap-2">Fill Details & Apply <ArrowRight size={15} /></span>
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* ── Step: Application Form ── */}
+            {modalStep === 'form' && (
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-6">
                 <AnimatedFormContainer onSubmit={handleSubmit} noValidate className="space-y-4">
                   <AnimatedInput 
                     id="career-name"
@@ -607,7 +728,8 @@ export default function Careers() {
                     defaultText="Submit Application"
                   />
                 </AnimatedFormContainer>
-            </div>
+              </div>
+            )}
           </div>
         </div>
       )}

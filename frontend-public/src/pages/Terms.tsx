@@ -48,8 +48,8 @@ export default function Terms() {
           <h2 className="text-xl font-bold text-brand-navy mt-8 mb-3">Contact</h2>
           <p className="leading-relaxed">
             For questions regarding these terms, contact us at{" "}
-            <a href="mailto:raashitechnologies@gmail.com" className="text-brand-blue underline">
-              raashitechnologies@gmail.com
+            <a href="mailto:info@raashitech.com" className="text-brand-blue underline">
+              info@raashitech.com
             </a>.
           </p>
         </div>

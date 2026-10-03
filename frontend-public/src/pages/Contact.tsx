@@ -45,8 +45,8 @@ export default function Contact() {
   const { getContent } = useContentContext();
   const contactInfo = getContent("contact_info");
   const phone = contactInfo?.phone || "+91 9742419316";
-  const email = contactInfo?.email || "raashitechnologies@gmail.com";
-  const address = contactInfo?.address || "69, CTS NO.4482B/67, Shruti Layout, Kanabargi Road, Belgaum Fort, Belgaum – 590016, Karnataka";
+  const email = contactInfo?.email || "info@raashitech.com";
+  const address = contactInfo?.address || "#69, CTS NO.4482B/67, Shruti Layout, Kanabargi Road, Belgaum – 590016, Karnataka";
   const hours = contactInfo?.hours || "Mon – Sat: 9:00 AM – 6:00 PM\nSunday: Closed";
 
   const faqsContent = getContent("faqs");
@@ -63,7 +63,7 @@ export default function Contact() {
   const canSubmit = 
     !validatePersonName(form.full_name) &&
     !validateEmail(form.email) &&
-    !validatePhone(form.phone, false) &&
+    !validatePhone(form.phone, true) &&
     !validateSelect(form.subject, "Please select a subject.") &&
     !validateFreeText(form.message, 10, 2000, true) &&
     !loading && 
@@ -77,7 +77,7 @@ export default function Contact() {
     const errors = {
       full_name: validatePersonName(form.full_name),
       email: validateEmail(form.email),
-      phone: validatePhone(form.phone, false),
+      phone: validatePhone(form.phone, true),
       subject: validateSelect(form.subject, "Please select a subject."),
       message: validateFreeText(form.message, 10, 2000, true),
     };
@@ -102,7 +102,7 @@ export default function Contact() {
       setSubmitted(true);
     } catch (err: any) {
       const apiError = normalizeApiError(err);
-      setError(apiError.message || "Something went wrong. Please email us directly at raashitechnologies@gmail.com");
+      setError(apiError.message || "Something went wrong. Please email us directly at info@raashitech.com");
     } finally {
       setLoading(false);
     }
@@ -187,7 +187,7 @@ export default function Contact() {
               />
             </span>
           </h1>
-              <p className="text-white/60 text-lg leading-relaxed">
+              <p className="text-white/60 text-lg leading-relaxed mb-0">
                 Whether you have a project idea, an internship query, or just want to say hello —
                 we'd love to hear from you. Reach out and our team will respond promptly.
               </p>
@@ -257,11 +257,11 @@ export default function Contact() {
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <label htmlFor="c-phone" className="block text-xs font-semibold text-brand-navy/70 mb-1.5">Phone Number</label>
-                        <input id="c-phone" type="tel" value={form.phone}
+                        <label htmlFor="c-phone" className="block text-xs font-semibold text-brand-navy/70 mb-1.5">Phone Number *</label>
+                        <input id="c-phone" type="tel" required value={form.phone}
                           onChange={e => {
                             setForm({ ...form, phone: e.target.value });
-                            setFieldErrors(prev => ({ ...prev, phone: validatePhone(e.target.value, false) }));
+                            setFieldErrors(prev => ({ ...prev, phone: validatePhone(e.target.value, true) }));
                           }}
                           aria-invalid={Boolean(fieldErrors.phone)}
                           aria-describedby={fieldErrors.phone ? "c-phone-error" : undefined}
